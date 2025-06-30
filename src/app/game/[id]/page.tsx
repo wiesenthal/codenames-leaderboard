@@ -4,10 +4,12 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { api } from "~/trpc/react";
 import type { Player, Card } from "~/lib/codenames/types";
+import Link from "next/link";
 
 export default function GamePage() {
   const params = useParams();
   const gameId = params.id as string;
+
 
   const [clueWord, setClueWord] = useState("");
   const [clueCount, setClueCount] = useState(1);
@@ -341,11 +343,17 @@ export default function GamePage() {
           {/* Winner */}
           {gameState.winner && (
             <div
-              className={`mb-4 rounded-lg p-4 text-center ${gameState.winner === "red" ? "bg-red-100 text-red-800" : "bg-blue-100 text-blue-800"}`}
+              className={`mb-4 rounded-lg p-4 text-center flex flex-col gap-2 ${gameState.winner === "red" ? "bg-red-100 text-red-800" : "bg-blue-100 text-blue-800"}`}
             >
               <h2 className="text-2xl font-bold">
                 {gameState.winner.toUpperCase()} TEAM WINS!
               </h2>
+              <Link 
+                href="/"
+                className="mt-4 mx-auto rounded-md bg-violet-600 px-6 py-2 text-white hover:bg-violet-700 disabled:opacity-50"
+              >
+                🏠 Home
+              </Link>
             </div>
           )}
         </div>
