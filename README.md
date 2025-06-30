@@ -1,29 +1,135 @@
-# Create T3 App
+# Codenames Leaderboard
 
-This is a [T3 Stack](https://create.t3.gg/) project bootstrapped with `create-t3-app`.
+A web interface for LLMs to play Codenames with leaderboard tracking.
 
-## What's next? How do I make an app with this?
+## Features
 
-We try to keep this project as simple as possible, so you can start with just the scaffolding we set up for you, and add additional things later when they become necessary.
+- **Human vs Human**: Classic Codenames gameplay in the browser
+- **Game State Management**: Complete game engine with move validation
+- **Real-time Updates**: Live game state synchronization
+- **Leaderboard Ready**: Database schema for tracking game results and player stats
+- **Extensible**: Designed to support multiple game types and AI integration
 
-If you are not familiar with the different technologies used in this project, please refer to the respective docs. If you still are in the wind, please join our [Discord](https://t3.gg/discord) and ask for help.
+## Getting Started
 
-- [Next.js](https://nextjs.org)
-- [NextAuth.js](https://next-auth.js.org)
-- [Prisma](https://prisma.io)
-- [Drizzle](https://orm.drizzle.team)
-- [Tailwind CSS](https://tailwindcss.com)
-- [tRPC](https://trpc.io)
+### Prerequisites
 
-## Learn More
+- Node.js 20+
+- PostgreSQL database
+- `.env` file with database configuration
 
-To learn more about the [T3 Stack](https://create.t3.gg/), take a look at the following resources:
+### Installation
 
-- [Documentation](https://create.t3.gg/)
-- [Learn the T3 Stack](https://create.t3.gg/en/faq#what-learning-resources-are-currently-available) — Check out these awesome tutorials
+```bash
+npm install
+```
 
-You can check out the [create-t3-app GitHub repository](https://github.com/t3-oss/create-t3-app) — your feedback and contributions are welcome!
+### Database Setup
 
-## How do I deploy this?
+```bash
+# Start the database (using provided script)
+./start-database.sh
 
-Follow our deployment guides for [Vercel](https://create.t3.gg/en/deployment/vercel), [Netlify](https://create.t3.gg/en/deployment/netlify) and [Docker](https://create.t3.gg/en/deployment/docker) for more information.
+# Push the schema
+npm run db:push
+```
+
+### Development
+
+```bash
+npm run dev
+```
+
+Visit [http://localhost:3000](http://localhost:3000) to start playing!
+
+## How to Play
+
+### Creating a Game
+
+1. Go to the homepage
+2. Enter names for 4 players (Red Spymaster, Red Operative, Blue Spymaster, Blue Operative)
+3. Click "Start Game"
+4. Share the generated player links with each participant
+
+### Gameplay
+
+**Spymasters:**
+- See all card colors on the 5x5 grid
+- Give one-word clues with a number (e.g., "animal: 2")
+- Help your team find your agents (red/blue cards)
+- Avoid the assassin (black card) at all costs!
+
+**Operatives:**
+- Listen to your spymaster's clues
+- Click cards to make guesses
+- Correctly guessed cards reveal their true colors
+- Pass your turn when unsure
+
+### Winning
+
+- First team to find all their agents wins
+- Game ends immediately if a team hits the assassin (they lose)
+
+## Game Engine
+
+The core game engine (`src/lib/codenames/game-engine.ts`) handles:
+
+- **Game Setup**: Random word selection, team assignment, key card generation
+- **Move Validation**: Ensures clues and guesses follow Codenames rules
+- **State Management**: Tracks turns, scores, and game history
+- **Win Conditions**: Detects game end states
+
+### Key Components
+
+- `CodenamesGameEngine`: Main game logic class
+- `GameState`: Complete game state interface
+- `Card`, `Player`, `Clue`, `Guess`: Core game entities
+- tRPC API: Server-side game operations
+
+## Architecture
+
+```
+src/
+  app/                    # Next.js pages
+    page.tsx             # Homepage with game creation
+    game/[id]/page.tsx   # Game interface
+  lib/codenames/         # Game engine
+    types.ts             # TypeScript interfaces
+    game-engine.ts       # Core game logic
+  server/
+    api/routers/game.ts  # tRPC game API
+    db/schema.ts         # Database schema
+  data/
+    words.txt            # Codenames word list
+```
+
+## Planned Features
+
+- [ ] AI player integration with OpenRouter
+- [ ] Tournament system
+- [ ] ELO rating system
+- [ ] Game replay and analysis
+- [ ] Support for other games (Wavelength, Just One, etc.)
+- [ ] Websocket support for real-time gameplay
+
+## Database Schema
+
+The app includes tables for:
+- `games`: Game state and metadata
+- `players`: Human and AI players
+- `game_participants`: Player-game relationships
+- `game_actions`: Move history
+- `player_stats`: Performance tracking
+- `tournaments`: Competition organization
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## License
+
+MIT License - see LICENSE file for details
