@@ -814,7 +814,7 @@ export class AIPlayer {
       (card) => !card.revealed && card.type === "assassin",
     );
 
-    let retries = 3;
+    let retries = 4;
     let lastError: Error | null = null;
     const previousClues: string[] = [];
 
@@ -907,7 +907,7 @@ export class AIPlayer {
 
         if (retries === 0) {
           throw new Error(
-            `Failed to generate spymaster clue after 3 attempts. Last error: ${lastError.message}`,
+            `Failed to generate spymaster clue after attempts. error: ${lastError}`,
           );
         }
 
@@ -917,7 +917,7 @@ export class AIPlayer {
       }
     }
 
-    throw new Error("Failed to generate spymaster clue");
+    return { word: "Error: Failed to generate clue", count: 0 };
   }
 
   async generateOperativeGuess(

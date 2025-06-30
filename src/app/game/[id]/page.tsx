@@ -3,13 +3,13 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { api } from "~/trpc/react";
-import type { Player, Card } from "~/lib/codenames/types";
+import type { Player, Card, GameState } from "~/lib/codenames/types";
 import Link from "next/link";
+import { useGameSocket } from "~/hooks/use-socket";
 
 export default function GamePage() {
   const params = useParams();
   const gameId = params.id as string;
-
 
   const [clueWord, setClueWord] = useState("");
   const [clueCount, setClueCount] = useState(1);
@@ -42,17 +42,18 @@ export default function GamePage() {
     onSuccess: () => void refetch(),
   });
 
-  const triggerAIMove = api.ai.triggerAIMove.useMutation({
-    onSuccess: (data) => {
-      console.log("AI Move Result:", data);
-      setAiThinking(false);
-      void refetch();
-    },
-    onError: (error) => {
-      console.error("AI Move Error:", error);
-      setAiThinking(false);
-    },
-  });
+  // AI moves are now handled by the backend via WebSockets
+  // const triggerAIMove = api.ai.triggerAIMove.useMutation({
+  //   onSuccess: (data) => {
+  //     console.log("AI Move Result:", data);
+  //     setAiThinking(false);
+  //     void refetch();
+  //   },
+  //   onError: (error) => {
+  //     console.error("AI Move Error:", error);
+  //     setAiThinking(false);
+  //   },
+  // });
 
   // Set player ID from URL or localStorage
   useEffect(() => {
@@ -73,42 +74,25 @@ export default function GamePage() {
     }
   }, []);
 
-  // Auto-trigger AI moves
+  // Use WebSocket for real-time game updates
+  const {
+    gameState: socketGameState,
+    aiThinking: socketAiThinking,
+    connected: socketConnected,
+  } = useGameSocket(gameId);
+
+  // Prefer WebSocket state over polling state when available
+  const currentGameState =
+    socketConnected && socketGameState ? socketGameState : gameState;
+
+  // Use WebSocket AI thinking state
   useEffect(() => {
-    if (!gameState || gameState.currentPhase === "game-over" || aiThinking)
-      return;
-
-    // Find the correct AI player for the current phase
-    let aiToMove: Player | undefined = undefined;
-    if (gameState.currentPhase === "giving-clue") {
-      aiToMove = gameState.players?.find(
-        (p) =>
-          p.team === gameState.currentTeam &&
-          p.role === "spymaster" &&
-          p.type === "ai",
-      );
-    } else if (gameState.currentPhase === "guessing") {
-      aiToMove = gameState.players?.find(
-        (p) =>
-          p.team === gameState.currentTeam &&
-          p.role === "operative" &&
-          p.type === "ai",
-      );
+    if (socketConnected) {
+      setAiThinking(socketAiThinking);
     }
+  }, [socketAiThinking, socketConnected]);
 
-    if (aiToMove) {
-      console.log(
-        `Triggering AI move for ${aiToMove.name} (${aiToMove.team} ${aiToMove.role})`,
-      );
-      setAiThinking(true);
-      // Add a small delay to make AI moves feel more natural
-      setTimeout(() => {
-        triggerAIMove.mutate({ gameId });
-      }, 500);
-    }
-  }, [gameState, aiThinking, triggerAIMove, gameId]);
-
-  if (!gameState) {
+  if (!currentGameState) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-100">
         <div className="text-center">
@@ -126,26 +110,28 @@ export default function GamePage() {
     );
   }
 
-  const currentPlayer = gameState.players?.find(
+  const currentPlayer = currentGameState.players?.find(
     (p: Player) => p.id === playerId,
   );
-  const isMyTurn = currentPlayer?.team === gameState.currentTeam;
+  const isMyTurn = currentPlayer?.team === currentGameState.currentTeam;
   const canGiveClue =
     isMyTurn &&
     currentPlayer?.role === "spymaster" &&
-    gameState.currentPhase === "giving-clue";
+    currentGameState.currentPhase === "giving-clue";
   const canGuess =
     isMyTurn &&
     currentPlayer?.role === "operative" &&
-    gameState.currentPhase === "guessing";
+    currentGameState.currentPhase === "guessing";
 
   // Get current AI player info
-  const currentAIPlayer = gameState.players?.find(
+  const currentAIPlayer = currentGameState.players?.find(
     (p) =>
-      p.team === gameState.currentTeam &&
+      p.team === currentGameState.currentTeam &&
       p.type === "ai" &&
-      ((gameState.currentPhase === "giving-clue" && p.role === "spymaster") ||
-        (gameState.currentPhase === "guessing" && p.role === "operative")),
+      ((currentGameState.currentPhase === "giving-clue" &&
+        p.role === "spymaster") ||
+        (currentGameState.currentPhase === "guessing" &&
+          p.role === "operative")),
   );
 
   const handleClueSubmit = (e: React.FormEvent) => {
@@ -161,7 +147,7 @@ export default function GamePage() {
   };
 
   const handleCardClick = (cardIndex: number) => {
-    if (canGuess && !gameState.cards?.[cardIndex]?.revealed) {
+    if (canGuess && !currentGameState.cards?.[cardIndex]?.revealed) {
       makeGuess.mutate({
         gameId,
         playerId,
@@ -222,7 +208,7 @@ export default function GamePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 flex flex-col">
+    <div className="flex min-h-screen flex-col bg-gray-100 p-4">
       <div className="mx-auto max-w-6xl">
         {/* Header */}
         <div className="mb-6 rounded-lg bg-white p-6 shadow-md">
@@ -240,43 +226,31 @@ export default function GamePage() {
             </div>
           </div>
 
-          {/* AI Activity Indicator */}
-          {currentAIPlayer && aiThinking && (
-            <div className="mb-4 rounded-lg border border-purple-300 bg-purple-100 p-3">
-              <div className="flex items-center">
-                <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-purple-600"></div>
-                <p className="text-purple-800">
-                  🤖 {currentAIPlayer.name} is thinking...
-                </p>
-              </div>
-            </div>
-          )}
-
           {/* Game Status */}
           <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="text-center">
               <p className="text-sm text-gray-600">Current Turn</p>
               <p
-                className={`text-lg font-semibold ${gameState.currentTeam === "red" ? "text-red-600" : "text-blue-600"}`}
+                className={`text-lg font-semibold ${currentGameState.currentTeam === "red" ? "text-red-600" : "text-blue-600"}`}
               >
-                {gameState.currentTeam?.toUpperCase()} TEAM
+                {currentGameState.currentTeam?.toUpperCase()} TEAM
               </p>
             </div>
             <div className="text-center">
               <p className="text-sm text-gray-600">Phase</p>
               <p className="text-lg font-semibold capitalize">
-                {gameState.currentPhase?.replace("-", " ")}
+                {currentGameState.currentPhase?.replace("-", " ")}
               </p>
             </div>
             <div className="text-center">
               <p className="text-sm text-gray-600">Remaining Agents</p>
               <p className="text-lg">
                 <span className="font-semibold text-red-600">
-                  Red: {gameState.redAgentsRemaining}
+                  Red: {currentGameState.redAgentsRemaining}
                 </span>
                 {" | "}
                 <span className="font-semibold text-blue-600">
-                  Blue: {gameState.blueAgentsRemaining}
+                  Blue: {currentGameState.blueAgentsRemaining}
                 </span>
               </p>
             </div>
@@ -289,7 +263,7 @@ export default function GamePage() {
                 Red Team
               </h3>
               <div className="space-y-1 text-xs">
-                {gameState.players
+                {currentGameState.players
                   ?.filter((p) => p.team === "red")
                   .map((p) => (
                     <div key={p.id} className="flex items-center">
@@ -308,7 +282,7 @@ export default function GamePage() {
                 Blue Team
               </h3>
               <div className="space-y-1 text-xs">
-                {gameState.players
+                {currentGameState.players
                   ?.filter((p) => p.team === "blue")
                   .map((p) => (
                     <div key={p.id} className="flex items-center">
@@ -324,33 +298,52 @@ export default function GamePage() {
             </div>
           </div>
 
-          {/* Current Clue */}
-          {gameState.currentClue && (
-            <div className="mb-4 rounded-lg bg-gray-50 p-4">
-              <p className="text-center">
-                <span className="text-sm text-gray-600">Current Clue: </span>
-                <span className="text-lg font-semibold">
-                  &quot;{gameState.currentClue.word.toUpperCase()}&quot; -{" "}
-                  {gameState.currentClue.count}
-                </span>
-                <span className="ml-2 text-sm text-gray-600">
-                  ({gameState.remainingGuesses} guesses left)
-                </span>
-              </p>
-            </div>
+          {!currentGameState.winner && (
+            <>
+              {/* Activity Indicator */}
+              <div className="mb-4 rounded-lg border border-purple-300 bg-purple-100 p-3">
+                <div className="flex items-center">
+                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-purple-600"></div>
+                  <p className="text-purple-800">
+                    {currentAIPlayer && aiThinking
+                      ? `🤖 ${currentAIPlayer.name} is thinking...`
+                      : "..."}
+                  </p>
+                </div>
+              </div>
+              {/* Current Clue */}
+              <div className="mb-4 rounded-lg bg-gray-50 p-4">
+                <p className="h-6 text-center">
+                  {currentGameState.currentClue && (
+                    <>
+                      <span className="text-sm text-gray-600">
+                        Current Clue:{" "}
+                      </span>
+                      <span className="text-lg font-semibold">
+                        &quot;{currentGameState.currentClue.word.toUpperCase()}
+                        &quot; - {currentGameState.currentClue.count}
+                      </span>
+                      <span className="ml-2 text-sm text-gray-600">
+                        ({currentGameState.remainingGuesses} guesses left)
+                      </span>
+                    </>
+                  )}
+                </p>
+              </div>
+            </>
           )}
 
           {/* Winner */}
-          {gameState.winner && (
+          {currentGameState.winner && (
             <div
-              className={`mb-4 rounded-lg p-4 text-center flex flex-col gap-2 ${gameState.winner === "red" ? "bg-red-100 text-red-800" : "bg-blue-100 text-blue-800"}`}
+              className={`mb-4 flex flex-col gap-2 rounded-lg p-4 text-center ${currentGameState.winner === "red" ? "bg-red-100 text-red-800" : "bg-blue-100 text-blue-800"}`}
             >
               <h2 className="text-2xl font-bold">
-                {gameState.winner.toUpperCase()} TEAM WINS!
+                {currentGameState.winner.toUpperCase()} TEAM WINS!
               </h2>
-              <Link 
+              <Link
                 href="/"
-                className="mt-4 mx-auto rounded-md bg-violet-600 px-6 py-2 text-white hover:bg-violet-700 disabled:opacity-50"
+                className="mx-auto mt-4 rounded-md bg-violet-600 px-6 py-2 text-white hover:bg-violet-700 disabled:opacity-50"
               >
                 🏠 Home
               </Link>
@@ -361,7 +354,7 @@ export default function GamePage() {
         {/* Game Board */}
         <div className="mb-6 rounded-lg bg-white p-6 shadow-md">
           <div className="mb-6 grid grid-cols-5 gap-3">
-            {gameState.cards?.map((card, index) => (
+            {currentGameState.cards?.map((card, index) => (
               <div
                 key={index}
                 className={getCardClassName(card)}
@@ -432,7 +425,7 @@ export default function GamePage() {
               <h3 className="mb-4 text-lg font-semibold">Make Your Guess</h3>
               <p className="mb-4 text-gray-600">
                 Click on a card to guess it. You have{" "}
-                {gameState.remainingGuesses} guesses remaining.
+                {currentGameState.remainingGuesses} guesses remaining.
               </p>
               <button
                 onClick={() => passTurn.mutate({ gameId, playerId })}
@@ -450,19 +443,19 @@ export default function GamePage() {
           )}
 
           {!isMyTurn &&
-            gameState.currentPhase !== "game-over" &&
+            currentGameState.currentPhase !== "game-over" &&
             !isSpectating && (
               <div className="text-center">
                 <p className="text-gray-600">
-                  Waiting for {gameState.currentTeam} team...
+                  Waiting for {currentGameState.currentTeam} team...
                 </p>
               </div>
             )}
 
-          {isSpectating && gameState.currentPhase !== "game-over" && (
+          {isSpectating && currentGameState.currentPhase !== "game-over" && (
             <div className="text-center">
               <p className="text-gray-600">
-                👁️ Spectating - {gameState.currentTeam} team&apos;s turn
+                👁️ Spectating - {currentGameState.currentTeam} team&apos;s turn
               </p>
               {currentAIPlayer && (
                 <p className="mt-2 text-sm text-gray-500">
@@ -472,16 +465,14 @@ export default function GamePage() {
               )}
             </div>
           )}
-
         </div>
-        
       </div>
       <Link
-            href="/"
-            className="mt-4 mx-auto rounded-md bg-violet-600 px-6 py-2 text-white hover:bg-violet-700 disabled:opacity-50"
-          >
-            🏠 Home
-          </Link>
+        href="/"
+        className="mx-auto mt-4 rounded-md bg-violet-600 px-6 py-2 text-white hover:bg-violet-700 disabled:opacity-50"
+      >
+        🏠 Home
+      </Link>
     </div>
   );
 }

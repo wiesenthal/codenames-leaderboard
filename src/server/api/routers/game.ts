@@ -2,9 +2,20 @@ import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 import { CodenamesGameEngine } from "~/lib/codenames/game-engine";
 import type { GameConfig } from "~/lib/codenames/types";
+import { gameOrchestrator } from "~/server/game/game-orchestrator";
 
-// In-memory game storage (replace with database later)
-export const activeGames = new Map<string, CodenamesGameEngine>();
+// For backwards compatibility, expose activeGames as a getter
+export const activeGames = {
+  get(gameId: string) {
+    return gameOrchestrator.getGame(gameId);
+  },
+  set(gameId: string, game: CodenamesGameEngine) {
+    gameOrchestrator.addGame(gameId, game);
+  },
+  delete(gameId: string) {
+    gameOrchestrator.removeGame(gameId);
+  }
+};
 
 export const gameRouter = createTRPCRouter({
   deleteGame: publicProcedure
@@ -50,6 +61,9 @@ export const gameRouter = createTRPCRouter({
         throw new Error(result.error ?? "Failed to give clue");
       }
 
+      // Notify orchestrator of state change
+      await gameOrchestrator.handleGameStateChange(input.gameId);
+
       return { success: true };
     }),
 
@@ -73,6 +87,9 @@ export const gameRouter = createTRPCRouter({
         throw new Error(result.error ?? "Failed to make guess");
       }
 
+      // Notify orchestrator of state change
+      await gameOrchestrator.handleGameStateChange(input.gameId);
+
       return { success: true, gameOver: result.gameOver };
     }),
 
@@ -95,28 +112,28 @@ export const gameRouter = createTRPCRouter({
         throw new Error(result.error ?? "Failed to pass turn");
       }
 
+      // Notify orchestrator of state change
+      await gameOrchestrator.handleGameStateChange(input.gameId);
+
       return { success: true };
     }),
 
   listGames: publicProcedure.query(async () => {
-    const games = Array.from(activeGames.entries()).map(([id, game]) => {
-      const state = game.getState();
-      return {
-        id,
-        players: state.players.map((p) => ({
-          name: p.name,
-          team: p.team,
-          role: p.role,
-          type: p.type,
-        })),
-        currentTeam: state.currentTeam,
-        currentPhase: state.currentPhase,
-        winner: state.winner,
-        createdAt: state.createdAt,
-      };
-    });
-
-    return games;
+    const activeGames = gameOrchestrator.getActiveGames();
+    
+    return activeGames.map(({ id, state }) => ({
+      id,
+      players: state.players.map((p) => ({
+        name: p.name,
+        team: p.team,
+        role: p.role,
+        type: p.type,
+      })),
+      currentTeam: state.currentTeam,
+      currentPhase: state.currentPhase,
+      winner: state.winner,
+      createdAt: state.createdAt,
+    }));
   }),
 
   // Quick start - create a game with default human players

@@ -55,9 +55,9 @@ export class CodenamesGameEngine {
     
     // Assign card types
     const cardTypes: CardType[] = [
-      ...Array(redCount).fill('red' as CardType),
-      ...Array(blueCount).fill('blue' as CardType),
-      ...Array(7).fill('neutral' as CardType), // 7 neutral cards
+      ...Array(redCount).fill('red') as CardType[],
+      ...Array(blueCount).fill('blue') as CardType[],
+      ...Array(7).fill('neutral') as CardType[], // 7 neutral cards
       'assassin' as CardType // 1 assassin
     ];
     
@@ -67,8 +67,8 @@ export class CodenamesGameEngine {
     // Create cards
     for (let i = 0; i < 25; i++) {
       cards.push({
-        word: words[i],
-        type: cardTypes[i],
+        word: words[i]!,
+        type: cardTypes[i]!,
         revealed: false,
         position: i,
       });
