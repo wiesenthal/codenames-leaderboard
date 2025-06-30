@@ -222,7 +222,7 @@ export default function GamePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4">
+    <div className="min-h-screen bg-gray-100 p-4 flex flex-col">
       <div className="mx-auto max-w-6xl">
         {/* Header */}
         <div className="mb-6 rounded-lg bg-white p-6 shadow-md">
@@ -472,8 +472,16 @@ export default function GamePage() {
               )}
             </div>
           )}
+
         </div>
+        
       </div>
+      <Link
+            href="/"
+            className="mt-4 mx-auto rounded-md bg-violet-600 px-6 py-2 text-white hover:bg-violet-700 disabled:opacity-50"
+          >
+            🏠 Home
+          </Link>
     </div>
   );
 }

@@ -139,7 +139,7 @@ export default function HomePage() {
                       </p>
                     </div>
 
-                    <div className="mt-3">
+                    <div className="mt-3 flex justify-between">
                       <button
                         onClick={() => router.push(`/game/${game.id}`)}
                         className="text-sm font-medium text-indigo-600 hover:text-indigo-800"
