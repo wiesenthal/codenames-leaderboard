@@ -48,6 +48,13 @@ export const ALL_MODELS: AIModel[] = [
     tokenLimit: 200000,
   },
   {
+    id: "x-ai/grok-4",
+    name: "Grok 4",
+    inputCost: 3,
+    outputCost: 15,
+    tokenLimit: 256000,
+  },
+  {
     id: "x-ai/grok-3-beta",
     name: "xAI: Grok 3 Beta",
     inputCost: 3,
@@ -853,11 +860,11 @@ export class AIPlayer {
     
     Respond with ONLY a JSON object in this format:
     {
-      "reasoning": "brief explanation of your choice",
+      ${this.withReasoning ? `"reasoning": "brief explanation of your choice",` : ""}
       "word": "your_clue_word",
       "count": number_of_related_cards
     }
-     
+
     ${lastError ? `Your previous clue: ${previousClues.at(-1)} were invalid. Last error: ${lastError.message}` : ""}
     `;
 
@@ -976,7 +983,7 @@ INSTRUCTIONS:
 
 Respond with ONLY a JSON object in this format:
 {
-  "reasoning": "brief explanation of your choice",
+  ${this.withReasoning ? `"reasoning": "brief explanation of your choice",` : ""}
   "cardIndex": number_from_list_above_or_-1_if_passing,
   "shouldPass": boolean
 }`;
