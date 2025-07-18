@@ -19,6 +19,9 @@ import {
   type InitializedCodenamesGameEngine,
 } from "../../lib/codenames/game-engine";
 import { CodenamesAI } from "../../lib/codenames/ai";
+import { sleep } from "~/lib/utils/misc";
+
+const MAX_ACTIVE_LOOPS = 100;
 
 // TODO: persist state of players in memory
 // Game orchestrator manages game state and AI moves
@@ -35,7 +38,9 @@ export class GameOrchestrator {
   ): Promise<InitializedCodenamesGameEngine> {
     const gameEngine = await CodenamesGameEngine.init(gameConfig);
 
-    void this.checkAndMarkAIToMove(gameEngine.gameId);
+    void this.checkAndMarkAIToMove(gameEngine.gameId).then(() =>
+      this.checkIfAIMoveIsNeeded(),
+    );
 
     return gameEngine;
   }
@@ -77,10 +82,12 @@ export class GameOrchestrator {
           completedAt: new Date(),
         })
         .where(eq(games.id, gameId));
+    } else {
+      await GameOrchestrator.checkAndMarkAIToMove(gameId);
     }
 
     // Check if we need to trigger an AI move
-    await GameOrchestrator.checkAndMarkAIToMove(gameId);
+    void this.checkIfAIMoveIsNeeded();
   }
 
   private static async checkAndMarkAIToMove(gameId: string): Promise<void> {
@@ -97,28 +104,24 @@ export class GameOrchestrator {
     }
 
     if (currentPlayer.type === "ai") {
-      // console.log(
-      //   `[Orchestrator] Executing immediate AI move for ${currentPlayer.name} (${currentPlayer.team} ${currentPlayer.data.role})`,
-      // );
-
-      // Execute AI move immediately
-      // void GameOrchestrator.executeAIMove(gameId, currentPlayer);
       // Mark the game as needing an AI move
       await db
         .update(games)
         .set({ shouldPromptAIMove: true })
         .where(eq(games.id, gameId));
-      void this.checkIfAIMoveIsNeeded();
-    } else {
-      console.log(
-        `[Orchestrator] ENDING LOOP. Current player is not an AI player.`,
-      );
     }
   }
 
   // ai move loop
   static async checkIfAIMoveIsNeeded(): Promise<void> {
+    if (this.numAILoopsActive >= MAX_ACTIVE_LOOPS) {
+      console.log(
+        `[Orchestrator] MAX ACTIVE LOOPS REACHED. ENDING LOOP. Active loops: ${this.numAILoopsActive}`,
+      );
+      return;
+    }
     // check if any games are marked as needing an ai move
+
     const game = await db.query.games.findFirst({
       where: eq(games.shouldPromptAIMove, true),
       orderBy: ({ updatedAt }, { asc }) => [asc(updatedAt)],
@@ -129,6 +132,7 @@ export class GameOrchestrator {
       );
       return;
     }
+
     // update it if it is needed
     const [updatedGame] = await db
       .update(games)
@@ -140,6 +144,7 @@ export class GameOrchestrator {
       console.log(
         `[Orchestrator] Race condition met, no game updated, so retrying. Active loops: ${this.numAILoopsActive}`,
       );
+      await sleep(10);
       void this.checkIfAIMoveIsNeeded();
       return;
     }
@@ -187,17 +192,6 @@ export class GameOrchestrator {
       return;
     }
     emitAIMoveComplete(gameId, player.id, action.data._type);
-  }
-
-  // Get all active games (for monitoring/admin purposes)
-  static async getActiveGames(): Promise<Array<Game>> {
-    return await db.query.games.findMany({
-      where: eq(games.archived, false),
-      with: {
-        players: true,
-        gameHistory: true,
-      },
-    });
   }
 }
 

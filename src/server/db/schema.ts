@@ -107,3 +107,33 @@ export const gameActions = createTable(
     index("game_action_timestamp_idx").on(t.timestamp),
   ],
 );
+
+export const gameEvents = createTable(
+  "game_event",
+  (d) => ({
+    id: d.integer().primaryKey().generatedByDefaultAsIdentity(),
+    gameId: d
+      .uuid()
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    team: d.text(),
+    playerId: d.uuid().references(() => players.id, {
+      onDelete: "cascade",
+      onUpdate: "cascade",
+    }),
+    actionId: d.integer().references(() => gameActions.id, {
+      onDelete: "cascade",
+      onUpdate: "cascade",
+    }),
+    data: jsonb("event_data").$type<GameEventData>().notNull(),
+    gameState: jsonb("game_state").$type<GameState>(),
+    timestamp: d
+      .timestamp({ withTimezone: true })
+      .default(sql`CURRENT_TIMESTAMP`)
+      .notNull(),
+  }),
+  (t) => [
+    index("game_event_game_idx").on(t.gameId),
+    index("game_event_timestamp_idx").on(t.timestamp),
+  ],
+);

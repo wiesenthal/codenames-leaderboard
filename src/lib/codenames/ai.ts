@@ -137,7 +137,7 @@ export class CodenamesAI {
     
     Respond with ONLY a JSON object in this format:
     {
-      ${player.withReasoning ? `"reasoning": "brief explanation of your choice",` : ""}
+      ${player.withReasoning ? `"reasoning": "think carefully before giving a clue",` : ""}
       "word": "your_clue_word",
       "count": number_of_related_cards
     }
@@ -183,10 +183,6 @@ export class CodenamesAI {
       } catch (error) {
         lastError = error as Error;
         retries--;
-
-        // console.log(
-        //   `AI clue generation failed, retrying... (${retries} attempts left). Error: ${lastError.message}`,
-        // );
       }
     }
 
@@ -194,12 +190,14 @@ export class CodenamesAI {
       `[AI] Failed to generate clue after ${historyToInclude} attempts. Error: ${lastError?.message ?? "Unknown error"}`,
     );
 
-    return {
+    const clue: Clue = {
       _gameType: "codenames",
       _type: "clue",
       word: "",
       count: 0,
     };
+
+    return clue;
   }
 
   async generateOperativeGuess(
@@ -262,7 +260,7 @@ INSTRUCTIONS:
 
 Respond with ONLY a JSON object in this format:
 {
-  ${player.withReasoning ? `"reasoning": "brief explanation of your choice",` : ""}
+  ${player.withReasoning ? `"reasoning": "think carefully before guessing",` : ""}
   "cardIndex": number_from_list_above_or_-1_if_passing,
   "shouldPass": boolean
 }`;

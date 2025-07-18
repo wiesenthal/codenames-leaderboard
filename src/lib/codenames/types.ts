@@ -20,6 +20,7 @@ export interface PlayerData {
 
 export interface Player {
   id: string;
+  gameId: string;
   name: string;
   type: PlayerType;
   team: Team;
@@ -33,7 +34,7 @@ export type AIPlayer = Player & {
   withReasoning: boolean;
 };
 
-export type PlayerWithoutId = Omit<Player, "id">;
+export type PlayerWithoutIds = Omit<Player, "id" | "gameId">;
 
 export interface GameState {
   _gameType: _gameType;
@@ -103,36 +104,26 @@ export type GameAction = GameActionInput & {
 export interface GameConfig {
   label?: string;
   words: string[];
-  players: PlayerWithoutId[];
+  players: PlayerWithoutIds[];
 }
-
-export type DeathWordGuessedEventData = {
-  _gameType: _gameType;
-  _type: "death_word_guessed";
-  deathWord: string;
-  clue: Clue;
-  gameState: GameState;
-};
 
 export type SpymasterFailedEventData = {
   _gameType: _gameType;
   _type: "spymaster_failed";
   clue: Clue;
-  gameState: GameState;
 };
 
 export type ClueRoundEndedEventData = {
   _gameType: _gameType;
-  _type: "clue_round_ended";
-  gameState: GameState;
+  _type: "guessing_round_ended";
+  clue: Clue | null;
   reason:
-    | "operative_passed"
-    | "operative_guessed_neutral"
-    | "operative_guessed_enemy"
-    | "operative_guessed_death_word";
+    | "passed"
+    | "ran_out_of_guesses"
+    | "guessed_neutral"
+    | "guessed_enemy"
+    | "guessed_assassin"
+    | "victory";
 };
 
-export type GameEventData =
-  | DeathWordGuessedEventData
-  | SpymasterFailedEventData
-  | ClueRoundEndedEventData;
+export type GameEventData = SpymasterFailedEventData | ClueRoundEndedEventData;

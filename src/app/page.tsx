@@ -3,13 +3,19 @@
 import { api } from "~/trpc/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useEffect } from "react";
 import { useRefetchAIMoves } from "~/hooks/useRefetchAIMoves";
+import { useState } from "react";
 
 export default function HomePage() {
   const router = useRouter();
 
-  const listGames = api.game.listGames.useQuery();
+  const [includeArchived, setIncludeArchived] = useState(false);
+  const [limit, setLimit] = useState(100);
+
+  const listGames = api.game.listGames.useQuery({
+    includeArchived,
+    limit,
+  });
 
   const deleteGame = api.game.deleteGame.useMutation({
     onSuccess: () => void listGames.refetch(),
@@ -42,9 +48,33 @@ export default function HomePage() {
         <div className="mx-auto grid max-w-4xl grid-cols-1 gap-8">
           {/* Active Games Section */}
           <div className="rounded-lg bg-white p-6 shadow-lg">
-            <h2 className="mb-6 text-2xl font-semibold text-gray-800">
-              Active Games
-            </h2>
+            <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+              <h2 className="text-2xl font-semibold text-gray-800">
+                Active Games
+              </h2>
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={includeArchived}
+                    onChange={(e) => setIncludeArchived(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                  />
+                  Include archived
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  Limit:
+                  <input
+                    type="number"
+                    min={1}
+                    max={500}
+                    value={limit}
+                    onChange={(e) => setLimit(Number(e.target.value))}
+                    className="w-16 rounded border border-gray-300 px-2 py-1 text-right focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                  />
+                </label>
+              </div>
+            </div>
 
             {listGames.isLoading && (
               <p className="text-gray-600">Loading games...</p>

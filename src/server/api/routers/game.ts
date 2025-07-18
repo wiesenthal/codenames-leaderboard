@@ -5,7 +5,7 @@ import { GameActionInputSchema, type GameConfig } from "~/lib/codenames/types";
 import { GameOrchestrator } from "~/server/game/game-orchestrator";
 import { db } from "~/server/db";
 import { games } from "~/server/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 export const gameRouter = createTRPCRouter({
   deleteGame: publicProcedure
@@ -17,16 +17,33 @@ export const gameRouter = createTRPCRouter({
         .where(eq(games.id, input.gameId));
     }),
 
-  listGames: publicProcedure.query(async () => {
-    try {
-      const activeGames = await GameOrchestrator.getActiveGames();
+  listGames: publicProcedure
+    .input(
+      z.object({
+        limit: z.number().optional().default(100),
+        includeArchived: z.boolean().optional().default(false),
+      }),
+    )
+    .query(async ({ input }) => {
+      try {
+        const archivedFilter = input.includeArchived
+          ? []
+          : [eq(games.archived, false)];
 
-      return activeGames;
-    } catch (error) {
-      console.error(error);
-      return [];
-    }
-  }),
+        return await db.query.games.findMany({
+          where: and(...archivedFilter),
+          limit: input.limit,
+          with: {
+            players: true,
+            gameHistory: true,
+          },
+          orderBy: ({ startedAt }, { desc }) => [desc(startedAt)],
+        });
+      } catch (error) {
+        console.error(error);
+        return [];
+      }
+    }),
 
   getGame: publicProcedure
     .input(z.object({ gameId: z.string() }))

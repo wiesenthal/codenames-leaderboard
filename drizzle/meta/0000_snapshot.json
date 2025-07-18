@@ -1,5 +1,5 @@
 {
-  "id": "24f57ccf-0111-4741-b0b7-8e6c21f4c87f",
+  "id": "be3d65fc-bc63-4102-a0d0-4325c2b39a2a",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -109,6 +109,150 @@
           "tableTo": "codenames_leaderboard_player",
           "columnsFrom": [
             "player_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.codenames_leaderboard_game_event": {
+      "name": "codenames_leaderboard_game_event",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "byDefault",
+            "name": "codenames_leaderboard_game_event_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "game_id": {
+          "name": "game_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "team": {
+          "name": "team",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "player_id": {
+          "name": "player_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "action_id": {
+          "name": "action_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "event_data": {
+          "name": "event_data",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "game_state": {
+          "name": "game_state",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "timestamp": {
+          "name": "timestamp",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "game_event_game_idx": {
+          "name": "game_event_game_idx",
+          "columns": [
+            {
+              "expression": "game_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "game_event_timestamp_idx": {
+          "name": "game_event_timestamp_idx",
+          "columns": [
+            {
+              "expression": "timestamp",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "codenames_leaderboard_game_event_game_id_codenames_leaderboard_game_id_fk": {
+          "name": "codenames_leaderboard_game_event_game_id_codenames_leaderboard_game_id_fk",
+          "tableFrom": "codenames_leaderboard_game_event",
+          "tableTo": "codenames_leaderboard_game",
+          "columnsFrom": [
+            "game_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        },
+        "codenames_leaderboard_game_event_player_id_codenames_leaderboard_player_id_fk": {
+          "name": "codenames_leaderboard_game_event_player_id_codenames_leaderboard_player_id_fk",
+          "tableFrom": "codenames_leaderboard_game_event",
+          "tableTo": "codenames_leaderboard_player",
+          "columnsFrom": [
+            "player_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        },
+        "codenames_leaderboard_game_event_action_id_codenames_leaderboard_game_action_id_fk": {
+          "name": "codenames_leaderboard_game_event_action_id_codenames_leaderboard_game_action_id_fk",
+          "tableFrom": "codenames_leaderboard_game_event",
+          "tableTo": "codenames_leaderboard_game_action",
+          "columnsFrom": [
+            "action_id"
           ],
           "columnsTo": [
             "id"

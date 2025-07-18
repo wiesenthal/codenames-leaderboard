@@ -15,7 +15,12 @@ import type {
 import { readFileSync } from "fs";
 import path from "path";
 import { db, type Transaction } from "../../server/db";
-import { gameActions, games, players } from "../../server/db/schema";
+import {
+  gameActions,
+  gameEvents,
+  games,
+  players,
+} from "../../server/db/schema";
 import wordExists from "word-exists";
 import { GameOrchestrator } from "../../server/game/game-orchestrator";
 
@@ -305,7 +310,7 @@ export class CodenamesGameEngine {
         count,
       };
 
-      await trx
+      const [gameAction] = await trx
         .insert(gameActions)
         .values({
           gameId: this.gameId,
@@ -314,6 +319,23 @@ export class CodenamesGameEngine {
           data: clue,
         })
         .returning();
+
+      const actionId = gameAction?.id;
+
+      if (clue.word === "" && count === 0) {
+        await trx.insert(gameEvents).values({
+          gameId: this.gameId,
+          team: player.team,
+          playerId,
+          actionId,
+          gameState: state,
+          data: {
+            _gameType: "codenames",
+            _type: "spymaster_failed",
+            clue,
+          },
+        });
+      }
 
       const updatedState: GameState = {
         ...state,
@@ -400,26 +422,50 @@ export class CodenamesGameEngine {
           data: guess,
         };
 
-        await trx.insert(gameActions).values(action);
+        const [gameAction] = await trx
+          .insert(gameActions)
+          .values(action)
+          .returning();
+
+        const actionId = gameAction?.id;
 
         // Check what type of card was revealed
         const guessingTeam = player.team;
-        let result: {
-          success: boolean;
-          error?: string;
-          gameState?: GameState;
-        } = {
-          success: true,
-        };
 
         if (card.type === "assassin") {
           // Game over - guessing team loses
           state.winner = guessingTeam === "red" ? "blue" : "red";
           state.currentPhase = "game-over";
-          result = { success: true };
-        }
-
-        if (card.type === guessingTeam) {
+          await trx.insert(gameEvents).values({
+            gameId: this.gameId,
+            team: player.team,
+            playerId,
+            actionId,
+            gameState: state,
+            data: {
+              _gameType: "codenames",
+              _type: "guessing_round_ended",
+              reason: "guessed_assassin",
+              clue: state.currentClue,
+            },
+          });
+        } else if (card.type === "neutral") {
+          // Neutral card - end turn
+          CodenamesGameEngine.endTurn(state);
+          await trx.insert(gameEvents).values({
+            gameId: this.gameId,
+            team: player.team,
+            playerId,
+            gameState: state,
+            actionId,
+            data: {
+              _gameType: "codenames",
+              _type: "guessing_round_ended",
+              reason: "guessed_neutral",
+              clue: state.currentClue,
+            },
+          });
+        } else if (card.type === guessingTeam) {
           // Correct guess - update remaining agents and continue guessing
           if (guessingTeam === "red") {
             state.redAgentsRemaining--;
@@ -431,26 +477,60 @@ export class CodenamesGameEngine {
           if (state.redAgentsRemaining === 0) {
             state.winner = "red";
             state.currentPhase = "game-over";
-            result = { success: true };
+            await trx.insert(gameEvents).values({
+              gameId: this.gameId,
+              team: player.team,
+              playerId,
+              actionId,
+              gameState: state,
+              data: {
+                _gameType: "codenames",
+                _type: "guessing_round_ended",
+                reason: "victory",
+                clue: state.currentClue,
+              },
+            });
           }
 
           if (state.blueAgentsRemaining === 0) {
             state.winner = "blue";
             state.currentPhase = "game-over";
-            result = { success: true };
+            await trx.insert(gameEvents).values({
+              gameId: this.gameId,
+              team: player.team,
+              playerId,
+              actionId,
+              gameState: state,
+              data: {
+                _gameType: "codenames",
+                _type: "guessing_round_ended",
+                reason: "victory",
+                clue: state.currentClue,
+              },
+            });
           }
 
           // Continue guessing
           state.remainingGuesses--;
           if (state.remainingGuesses <= 0) {
             CodenamesGameEngine.endTurn(state);
+            await trx.insert(gameEvents).values({
+              gameId: this.gameId,
+              team: player.team,
+              playerId,
+              actionId,
+              gameState: state,
+              data: {
+                _gameType: "codenames",
+                _type: "guessing_round_ended",
+                reason: "ran_out_of_guesses",
+                clue: state.currentClue,
+              },
+            });
           }
-
-          result = { success: true };
         }
-
-        // Wrong guess (neutral or enemy agent) - end turn
-        if (card.type !== "neutral" && card.type !== guessingTeam) {
+        // Enemy agent
+        else {
           // Enemy agent - update their count
           if (card.type === "red") {
             state.redAgentsRemaining--;
@@ -458,18 +538,32 @@ export class CodenamesGameEngine {
             state.blueAgentsRemaining--;
           }
 
-          // Check for win condition
+          // Check for win condition - these should never
           if (state.redAgentsRemaining === 0) {
             state.winner = "red";
             state.currentPhase = "game-over";
-            result = { success: true };
           }
 
           if (state.blueAgentsRemaining === 0) {
             state.winner = "blue";
             state.currentPhase = "game-over";
-            result = { success: true };
           }
+
+          // end turn
+          CodenamesGameEngine.endTurn(state);
+          await trx.insert(gameEvents).values({
+            gameId: this.gameId,
+            team: player.team,
+            playerId,
+            actionId,
+            gameState: state,
+            data: {
+              _gameType: "codenames",
+              _type: "guessing_round_ended",
+              reason: "guessed_enemy",
+              clue: state.currentClue,
+            },
+          });
         }
 
         await trx
@@ -480,7 +574,7 @@ export class CodenamesGameEngine {
           .where(eq(games.id, this.gameId));
 
         return {
-          ...result,
+          success: true,
           gameState: state,
         };
       },
@@ -519,8 +613,28 @@ export class CodenamesGameEngine {
         },
       };
 
-      await trx.insert(gameActions).values(action);
+      const [gameAction] = await trx
+        .insert(gameActions)
+        .values(action)
+        .returning();
+
+      const actionId = gameAction?.id;
+
       CodenamesGameEngine.endTurn(state);
+      await trx.insert(gameEvents).values({
+        gameId: this.gameId,
+        team: player.team,
+        playerId,
+        gameState: state,
+        actionId,
+        data: {
+          _gameType: "codenames",
+          _type: "guessing_round_ended",
+          reason: "passed",
+          clue: state.currentClue,
+        },
+      });
+
       await trx
         .update(games)
         .set({

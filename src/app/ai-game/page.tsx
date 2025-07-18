@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api } from "~/trpc/react";
 import { useRouter } from "next/navigation";
 import type { Player } from "~/lib/codenames/types";
+import { sleep } from "~/lib/utils/misc";
 
 type PlayerConfig = {
   aiModel: string;
@@ -67,11 +68,13 @@ export default function AIGamePage() {
   const handleCreateAIvsAI = async () => {
     console.log("creating games", numberOfGames, label);
     await Promise.all(
-      Array.from({ length: numberOfGames }).map(() =>
-        createGame.mutateAsync({
-          players,
-          label,
-        }),
+      Array.from({ length: numberOfGames }).map((_, i) =>
+        sleep(i).then(() =>
+          createGame.mutateAsync({
+            players,
+            label,
+          }),
+        ),
       ),
     );
   };
