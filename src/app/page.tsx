@@ -1,47 +1,17 @@
 "use client";
 
-import { useState } from "react";
 import { api } from "~/trpc/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 export default function HomePage() {
-  const [playerNames, setPlayerNames] = useState(["", "", "", ""]);
   const router = useRouter();
-
-  const createGame = api.game.quickStart.useMutation({
-    onSuccess: (data) => {
-      // Redirect each player to the game with their player ID
-      const redSpymaster = data.players.find(
-        (p) => p.team === "red" && p.role === "spymaster",
-      )?.id;
-      if (redSpymaster) {
-        // Open the game for the first player (red spymaster)
-        router.push(`/game/${data.gameId}?playerId=${redSpymaster}`);
-      }
-    },
-  });
 
   const listGames = api.game.listGames.useQuery();
 
   const deleteGame = api.game.deleteGame.useMutation({
     onSuccess: () => void listGames.refetch(),
   });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (playerNames.every((name) => name.trim())) {
-      createGame.mutate({
-        playerNames: playerNames.map((name) => name.trim()),
-      });
-    }
-  };
-
-  const handlePlayerNameChange = (index: number, value: string) => {
-    const newNames = [...playerNames];
-    newNames[index] = value;
-    setPlayerNames(newNames);
-  };
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -62,18 +32,10 @@ export default function HomePage() {
             >
               🤖 Create Game
             </Link>
-            {/* <button
-              onClick={() => window.scrollTo({ top: 400, behavior: 'smooth' })}
-              className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-semibold transition-colors"
-            >
-              👥 Human vs Human
-            </button> */}
           </div>
         </div>
 
-        <div className="mx-auto grid grid-cols-1 gap-8 max-w-4xl">
-
-
+        <div className="mx-auto grid max-w-4xl grid-cols-1 gap-8">
           {/* Active Games Section */}
           <div className="rounded-lg bg-white p-6 shadow-lg">
             <h2 className="mb-6 text-2xl font-semibold text-gray-800">
@@ -104,24 +66,24 @@ export default function HomePage() {
                           Current:{" "}
                           <span
                             className={
-                              game.currentTeam === "red"
+                              game.gameState.currentTeam === "red"
                                 ? "text-red-600"
                                 : "text-blue-600"
                             }
                           >
-                            {game.currentTeam} team
+                            {game.gameState.currentTeam} team
                           </span>
                         </p>
                       </div>
                       <div className="text-right">
                         <p className="text-sm text-gray-600 capitalize">
-                          {game.currentPhase?.replace("-", " ")}
+                          {game.gameState.currentPhase?.replace("-", " ")}
                         </p>
-                        {game.winner && (
+                        {game.gameState.winner && (
                           <p
-                            className={`text-sm font-medium ${game.winner === "red" ? "text-red-600" : "text-blue-600"}`}
+                            className={`text-sm font-medium ${game.gameState.winner === "red" ? "text-red-600" : "text-blue-600"}`}
                           >
-                            {game.winner.toUpperCase()} WINS
+                            {game.gameState.winner.toUpperCase()} WINS
                           </p>
                         )}
                       </div>
@@ -131,11 +93,11 @@ export default function HomePage() {
                       <p>
                         Players:{" "}
                         {game.players
-                          .map((p) => `${p.name} (${p.team} ${p.role})`)
+                          .map((p) => `${p.name} (${p.team} ${p.data.role})`)
                           .join(", ")}
                       </p>
                       <p>
-                        Started: {new Date(game.createdAt).toLocaleString()}
+                        Started: {new Date(game.startedAt).toLocaleString()}
                       </p>
                     </div>
 
@@ -151,7 +113,7 @@ export default function HomePage() {
                         disabled={deleteGame.isPending}
                         className="ml-3 text-sm font-medium text-red-600 hover:text-red-800 disabled:opacity-50"
                       >
-                        {deleteGame.isPending ? "Deleting..." : "Delete"}
+                        {deleteGame.isPending ? "Archiving..." : "Archive"}
                       </button>
                     </div>
                   </div>

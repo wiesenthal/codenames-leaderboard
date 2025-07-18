@@ -1,14 +1,15 @@
-import { useEffect, useState, useCallback, useRef } from "react";
-import { io, Socket } from "socket.io-client";
-import type { 
-  ServerToClientEvents, 
-  ClientToServerEvents
+import { useEffect, useState, useRef } from "react";
+import { io, type Socket } from "socket.io-client";
+import type {
+  ServerToClientEvents,
+  ClientToServerEvents,
 } from "~/server/websocket/socket-server";
 import type { GameState, Team } from "~/lib/codenames/types";
 
 type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL ?? "http://localhost:3000";
+const SOCKET_URL =
+  process.env.NEXT_PUBLIC_SOCKET_URL ?? "http://localhost:3000";
 
 export function useSocket() {
   const [socket, setSocket] = useState<TypedSocket | null>(null);
@@ -49,8 +50,9 @@ export function useSocket() {
 // Hook for game-specific socket connection
 export function useGameSocket(gameId: string | undefined) {
   const { socket, connected } = useSocket();
-  const [gameState, setGameState] = useState<Partial<GameState> | null>(null);
+  const [gameState, setGameState] = useState<GameState | null>(null);
   const [aiThinking, setAiThinking] = useState(false);
+
   const currentGameIdRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
@@ -62,29 +64,35 @@ export function useGameSocket(gameId: string | undefined) {
       if (currentGameIdRef.current) {
         socket.emit("leaveGame", currentGameIdRef.current);
       }
-      
+
       // Join new game
       socket.emit("joinGame", gameId);
       currentGameIdRef.current = gameId;
     }
 
     // Set up event listeners
-    const handleGameStateUpdate = (state: Partial<GameState>) => {
+    const handleGameStateUpdate = (state: GameState) => {
       console.log("[Socket] Game state updated", state);
       setGameState(state);
     };
 
-    const handleAIThinking = (data: { playerId: string; playerName: string }) => {
+    const handleAIThinking = (data: {
+      playerId: string;
+      playerName: string;
+    }) => {
       console.log(`[Socket] AI thinking: ${data.playerName}`);
       setAiThinking(true);
     };
 
-    const handleAIMoveComplete = (data: { playerId: string; action: string }) => {
+    const handleAIMoveComplete = (data: {
+      playerId: string;
+      action: string;
+    }) => {
       console.log(`[Socket] AI move complete: ${data.action}`);
       setAiThinking(false);
     };
 
-    const handleGameEnded = (data: { gameId: string; winner: Team; players: Array<{ name: string; team: Team; role: string; type: string }> }) => {
+    const handleGameEnded = (data: { gameId: string; winner: Team }) => {
       console.log(`[Socket] Game ended: ${data.winner} wins!`);
     };
 
@@ -118,33 +126,36 @@ export function useGameSocket(gameId: string | undefined) {
     };
   }, [socket, connected]);
 
-  return { socket, connected, gameState, aiThinking };
+  return {
+    socket,
+    connected,
+    gameState,
+    setGameState,
+    aiThinking,
+  };
 }
 
 // Hook for main page to listen to game endings
 export function useGameEndingsSocket() {
   const { socket, connected } = useSocket();
-  const [recentGameEndings, setRecentGameEndings] = useState<Array<{
-    gameId: string;
-    winner: Team;
-    players: Array<{ name: string; team: Team; role: string; type: string }>;
-    timestamp: Date;
-  }>>([]);
+  const [recentGameEndings, setRecentGameEndings] = useState<
+    Array<{
+      gameId: string;
+      winner: Team;
+      timestamp: Date;
+    }>
+  >([]);
 
   useEffect(() => {
     if (!socket || !connected) return;
 
     socket.emit("subscribeToGameEndings");
 
-    const handleGameEnded = (data: { 
-      gameId: string; 
-      winner: Team;
-      players: Array<{ name: string; team: Team; role: string; type: string }>;
-    }) => {
+    const handleGameEnded = (data: { gameId: string; winner: Team }) => {
       console.log(`[Socket] Game ${data.gameId} ended: ${data.winner} wins!`);
-      setRecentGameEndings(prev => [
+      setRecentGameEndings((prev) => [
         { ...data, timestamp: new Date() },
-        ...prev.slice(0, 9) // Keep last 10 games
+        ...prev.slice(0, 9), // Keep last 10 games
       ]);
     };
 
@@ -157,4 +168,4 @@ export function useGameEndingsSocket() {
   }, [socket, connected]);
 
   return { recentGameEndings };
-} 
+}

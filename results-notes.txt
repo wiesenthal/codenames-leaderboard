@@ -1,0 +1,4 @@
+Claude-sonnet-4 vs gpt-4o-mini (non reasoning)
+61 - 39
+95% CI: 50.2% to 71.2%
+

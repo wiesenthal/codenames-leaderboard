@@ -1,7 +1,10 @@
-import type { GameState, Team } from "~/lib/codenames/types";
+import type { GameState, Team } from "../../lib/codenames/types";
 
 // Safe wrapper functions that check if Socket.IO is available
-export function safeEmitGameStateUpdate(gameId: string, gameState: Partial<GameState>): void {
+export function safeEmitGameStateUpdate(
+  gameId: string,
+  gameState: GameState,
+): void {
   try {
     if (typeof global !== "undefined" && global.io) {
       global.io.to(`game:${gameId}`).emit("gameStateUpdate", gameState);
@@ -11,39 +14,54 @@ export function safeEmitGameStateUpdate(gameId: string, gameState: Partial<GameS
   }
 }
 
-export function safeEmitGameEnded(gameId: string, winner: Team, players: Array<{ name: string; team: Team; role: string; type: string }>): void {
+export function safeEmitGameEnded(gameId: string, winner: Team): void {
   try {
     if (typeof global !== "undefined" && global.io) {
       // Emit to both the game room and the game-endings room
-      global.io.to(`game:${gameId}`).emit("gameEnded", { gameId, winner, players });
-      global.io.to("game-endings").emit("gameEnded", { gameId, winner, players });
+      global.io.to(`game:${gameId}`).emit("gameEnded", { gameId, winner });
+      global.io.to("game-endings").emit("gameEnded", { gameId, winner });
     }
   } catch (error) {
     // Socket.IO not available - gracefully ignore
   }
 }
 
-export function safeEmitAIThinking(gameId: string, playerId: string, playerName: string): void {
+export function safeEmitAIThinking(
+  gameId: string,
+  playerId: string,
+  playerName: string,
+): void {
   try {
     if (typeof global !== "undefined" && global.io) {
-      global.io.to(`game:${gameId}`).emit("aiThinking", { playerId, playerName });
+      global.io
+        .to(`game:${gameId}`)
+        .emit("aiThinking", { playerId, playerName });
     }
   } catch (error) {
     // Socket.IO not available - gracefully ignore
   }
 }
 
-export function safeEmitAIMoveComplete(gameId: string, playerId: string, action: string): void {
+export function safeEmitAIMoveComplete(
+  gameId: string,
+  playerId: string,
+  action: string,
+): void {
   try {
     if (typeof global !== "undefined" && global.io) {
-      global.io.to(`game:${gameId}`).emit("aiMoveComplete", { playerId, action });
+      global.io
+        .to(`game:${gameId}`)
+        .emit("aiMoveComplete", { playerId, action });
     }
   } catch (error) {
     // Socket.IO not available - gracefully ignore
   }
 }
 
-export function safeEmitGameError(gameId: string, error: { message: string; code?: string }): void {
+export function safeEmitGameError(
+  gameId: string,
+  error: { message: string; code?: string },
+): void {
   try {
     if (typeof global !== "undefined" && global.io) {
       global.io.to(`game:${gameId}`).emit("gameError", error);
@@ -51,4 +69,4 @@ export function safeEmitGameError(gameId: string, error: { message: string; code
   } catch (error) {
     // Socket.IO not available - gracefully ignore
   }
-} 
+}

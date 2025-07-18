@@ -40,6 +40,8 @@ export function ensureSocketServer() {
     // This is a simplified version for Next.js API routes
     // In production, you'd use the custom server above
     socketServerInitialized = true;
-    console.log("[WebSocket] Socket server marked as initialized (API route mode)");
+    console.log(
+      "[WebSocket] Socket server marked as initialized (API route mode)",
+    );
   }
-} 
+}

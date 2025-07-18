@@ -12,12 +12,12 @@
     "db:studio": "drizzle-kit studio",
     "dev": "node server.js",
     "dev:no-socket": "next dev --turbo",
+    "preview": "next build && NODE_ENV=production node server.js",
+    "start": "NODE_ENV=production node server.js",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,mdx}\" --cache",
     "format:write": "prettier --write \"**/*.{ts,tsx,js,jsx,mdx}\" --cache",
     "lint": "next lint",
     "lint:fix": "next lint --fix",
-    "preview": "next build && NODE_ENV=production node server.js",
-    "start": "NODE_ENV=production node server.js",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -29,6 +29,7 @@
     "@trpc/server": "^11.0.0",
     "ai": "^4.3.16",
     "drizzle-orm": "^0.41.0",
+    "import-single-ts": "^1.2.1",
     "next": "^15.2.3",
     "postgres": "^3.4.4",
     "react": "^19.0.0",
@@ -37,6 +38,7 @@
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
     "superjson": "^2.2.1",
+    "word-exists": "^1.0.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {
@@ -55,6 +57,7 @@
     "prettier": "^3.5.3",
     "prettier-plugin-tailwindcss": "^0.6.11",
     "tailwindcss": "^4.0.15",
+    "tsx": "^4.19.3",
     "typescript": "^5.8.2",
     "typescript-eslint": "^8.27.0"
   },

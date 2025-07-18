@@ -81,7 +81,7 @@ export default function AIGamePage() {
 
   const getRoleName = (player: Player) => {
     const team = player.team === "red" ? "Red" : "Blue";
-    const role = player.role === "spymaster" ? "Spymaster" : "Operative";
+    const role = player.data.role === "spymaster" ? "Spymaster" : "Operative";
     return `${team} Team ${role}`;
   };
 
@@ -101,7 +101,7 @@ export default function AIGamePage() {
             </p>
           </div>
 
-          <div className="mx-auto flex w-full max-w-lg justify-center gap-4 px-2 mt-2">
+          <div className="mx-auto mt-2 flex w-full max-w-lg justify-center gap-4 px-2">
             <button
               onClick={() => router.push("/")}
               className="flex-1 rounded-md bg-blue-600 px-6 py-3 font-semibold text-white hover:bg-blue-700"

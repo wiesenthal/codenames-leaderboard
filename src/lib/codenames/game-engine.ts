@@ -1,69 +1,146 @@
-import type { GameState, GameConfig, Card, CardType, Team, Clue, Guess, GameAction, Player, GamePhase } from './types';
-import { readFileSync } from 'fs';
-import path from 'path';
+import { eq } from "drizzle-orm";
+import type {
+  GameState,
+  GameConfig,
+  Card,
+  CardType,
+  Team,
+  Clue,
+  Guess,
+  GameAction,
+  Player,
+  Game,
+  GameActionInput,
+} from "./types";
+import { readFileSync } from "fs";
+import path from "path";
+import { db, type Transaction } from "../../server/db";
+import { gameActions, games, players } from "../../server/db/schema";
+import wordExists from "word-exists";
+import { GameOrchestrator } from "../../server/game/game-orchestrator";
+
+const _gameType = "codenames";
+
+export type InitializedCodenamesGameEngine = CodenamesGameEngine & {
+  isInitialized: true;
+};
 
 export class CodenamesGameEngine {
-  private state: GameState;
+  public gameId: string;
+  public players: Player[]; // Store players because assume they won't change after initialization
+  public isInitialized: boolean;
 
-  constructor(config: GameConfig) {
-    this.state = this.initializeGame(config);
+  constructor({ gameId }: { gameId: string }) {
+    this.gameId = gameId;
+    this.isInitialized = false;
+    this.players = [];
   }
 
-  private initializeGame(config: GameConfig): GameState {
+  private ensureInitialized(): this is InitializedCodenamesGameEngine {
+    if (!this.isInitialized) throw new Error("Game not initialized");
+    return true;
+  }
+
+  public static async init(
+    config: GameConfig,
+  ): Promise<InitializedCodenamesGameEngine> {
+    return await db.transaction(async (trx) => {
+      const gameState = CodenamesGameEngine.initializeGameState(config);
+      const [game] = await trx
+        .insert(games)
+        .values({
+          status: "active",
+          gameState,
+        })
+        .returning();
+
+      if (!game) throw new Error("Failed to initialize game, no game returned");
+
+      const dbPlayers = await trx
+        .insert(players)
+        .values(
+          config.players.map((p) => ({
+            ...p,
+            gameId: game.id,
+          })),
+        )
+        .returning();
+
+      const gameEngine = new CodenamesGameEngine({ gameId: game.id });
+      gameEngine.isInitialized = true;
+      gameEngine.players = dbPlayers;
+
+      return gameEngine as InitializedCodenamesGameEngine;
+    });
+  }
+
+  public async loadFromDb(): Promise<Game> {
+    const game = await db.query.games.findFirst({
+      where: eq(games.id, this.gameId),
+      with: {
+        players: true,
+        gameHistory: true,
+      },
+    });
+    if (!game) throw new Error("Game not found");
+    this.isInitialized = true;
+    this.players = game.players;
+    return game;
+  }
+
+  private static initializeGameState(config: GameConfig): GameState {
     // Select 25 random words
     const shuffledWords = [...config.words].sort(() => Math.random() - 0.5);
     const gameWords = shuffledWords.slice(0, 25);
 
     // Generate the key card - determine team assignments
-    const startingTeam: Team = Math.random() < 0.5 ? 'red' : 'blue';
-    const { cards, redCount, blueCount } = this.generateKeyCard(gameWords, startingTeam);
+    const startingTeam: Team = Math.random() < 0.5 ? "red" : "blue";
+    const { cards, redCount, blueCount } = this.generateKeyCard(
+      gameWords,
+      startingTeam,
+    );
 
-    // Create players with IDs
-    const players: Player[] = config.players.map((player, index) => ({
-      ...player,
-      id: `player-${index + 1}`,
-    }));
-
-    return {
-      id: `game-${Date.now()}`,
+    const gameState: GameState = {
+      _gameType,
       cards,
-      players,
       currentTeam: startingTeam,
-      currentPhase: 'giving-clue',
+      currentPhase: "giving-clue",
       currentClue: null,
       remainingGuesses: 0,
       winner: null,
       startingTeam,
       redAgentsRemaining: redCount,
       blueAgentsRemaining: blueCount,
-      gameHistory: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
     };
+
+    return gameState;
   }
 
-  private generateKeyCard(words: string[], startingTeam: Team): { cards: Card[], redCount: number, blueCount: number } {
+  private static generateKeyCard(
+    words: string[],
+    startingTeam: Team,
+  ): { cards: Card[]; redCount: number; blueCount: number } {
     const cards: Card[] = [];
     const positions = Array.from({ length: 25 }, (_, i) => i);
-    
+
     // Shuffle positions
     positions.sort(() => Math.random() - 0.5);
-    
+
     // Starting team gets 9 agents, other team gets 8
-    const redCount = startingTeam === 'red' ? 9 : 8;
-    const blueCount = startingTeam === 'blue' ? 9 : 8;
-    
+    const redCount = startingTeam === "red" ? 9 : 8;
+    const blueCount = startingTeam === "blue" ? 9 : 8;
+
     // Assign card types
     const cardTypes: CardType[] = [
-      ...Array(redCount).fill('red') as CardType[],
-      ...Array(blueCount).fill('blue') as CardType[],
-      ...Array(7).fill('neutral') as CardType[], // 7 neutral cards
-      'assassin' as CardType // 1 assassin
+      ...(Array(redCount).fill("red") as CardType[]),
+      ...(Array(blueCount).fill("blue") as CardType[]),
+      ...(Array(7).fill("neutral") as CardType[]), // 7 neutral cards
+      "assassin" as CardType, // 1 assassin
     ];
-    
+
     // Shuffle card types
     cardTypes.sort(() => Math.random() - 0.5);
-    
+
     // Create cards
     for (let i = 0; i < 25; i++) {
       cards.push({
@@ -73,283 +150,449 @@ export class CodenamesGameEngine {
         position: i,
       });
     }
-    
+
     return { cards, redCount, blueCount };
   }
 
-  public getState(): GameState {
-    return { ...this.state };
+  public async getState(trx?: Transaction): Promise<GameState | null> {
+    this.ensureInitialized();
+    const [game] = await (trx ?? db)
+      .select()
+      .from(games)
+      .where(eq(games.id, this.gameId));
+    if (!game) return null;
+    return game.gameState;
   }
 
-  public getPublicState(playerId: string): Partial<GameState> {
-    const player = this.state.players.find(p => p.id === playerId);
-    const isSpymaster = player?.role === 'spymaster';
-    
+  public getPlayer(playerId: string): Player | null {
+    this.ensureInitialized();
+    return this.players.find((p) => p.id === playerId) ?? null;
+  }
+
+  public async getPublicState(playerId: string): Promise<GameState | null> {
+    this.ensureInitialized();
+
+    const state = await this.getState();
+    if (!state) return null;
+
+    const player = this.getPlayer(playerId);
+    const isSpymaster = player?.data?.role === "spymaster";
+
     return {
-      id: this.state.id,
-      cards: this.state.cards.map(card => ({
+      ...state,
+      cards: state.cards.map((card) => ({
         ...card,
         // Only spymasters can see unrevealed card types
-        type: card.revealed || isSpymaster ? card.type : 'neutral' as CardType,
+        type:
+          card.revealed || isSpymaster ? card.type : ("neutral" as CardType),
       })),
-      players: this.state.players,
-      currentTeam: this.state.currentTeam,
-      currentPhase: this.state.currentPhase,
-      currentClue: this.state.currentClue,
-      remainingGuesses: this.state.remainingGuesses,
-      winner: this.state.winner,
-      redAgentsRemaining: this.state.redAgentsRemaining,
-      blueAgentsRemaining: this.state.blueAgentsRemaining,
-      gameHistory: this.state.gameHistory,
     };
   }
 
-  public giveClue(playerId: string, word: string, count: number): { success: boolean; error?: string } {
-    const player = this.state.players.find(p => p.id === playerId);
-    
-    if (!player) {
-      return { success: false, error: 'Player not found' };
-    }
-    
-    if (player.role !== 'spymaster') {
-      return { success: false, error: 'Only spymasters can give clues' };
-    }
-    
-    if (player.team !== this.state.currentTeam) {
-      return { success: false, error: 'Not your turn' };
-    }
-    
-    if (this.state.currentPhase !== 'giving-clue') {
-      return { success: false, error: 'Not in clue-giving phase' };
-    }
-    
-    const clueValidation = this.validateClue(word, count);
-    if (!clueValidation.valid) {
-      return { success: false, error: clueValidation.error };
-    }
-    
-    const clue: Clue = {
-      word: word.toLowerCase(),
-      count,
-      team: player.team,
-      spymasterId: playerId,
-    };
-    
-    const action: GameAction = {
-      type: 'clue',
-      timestamp: new Date(),
-      playerId,
-      team: player.team,
-      data: clue,
-    };
-    
-    this.state.currentClue = clue;
-    this.state.currentPhase = 'guessing';
-    this.state.remainingGuesses = count + 1; // Players get one extra guess
-    this.state.gameHistory.push(action);
-    this.state.updatedAt = new Date();
-    
-    return { success: true };
+  public async getCurrentPlayer(): Promise<Player | null> {
+    this.ensureInitialized();
+    const state = await this.getState();
+    if (!state) return null;
+    const currentTeam = state.currentTeam;
+    const currentPhase = state.currentPhase;
+
+    if (currentPhase === "giving-clue")
+      return (
+        this.players.find(
+          (p) => p.team === currentTeam && p.data.role === "spymaster",
+        ) ?? null
+      );
+    if (currentPhase === "guessing")
+      return (
+        this.players.find(
+          (p) => p.team === currentTeam && p.data.role === "operative",
+        ) ?? null
+      );
+
+    return null;
   }
 
-  public makeGuess(playerId: string, cardIndex: number): { success: boolean; error?: string; gameOver?: boolean } {
-    const player = this.state.players.find(p => p.id === playerId);
-    
-    if (!player) {
-      return { success: false, error: 'Player not found' };
-    }
-    
-    if (player.role !== 'operative') {
-      return { success: false, error: 'Only operatives can make guesses' };
-    }
-    
-    if (player.team !== this.state.currentTeam) {
-      return { success: false, error: 'Not your turn' };
-    }
-    
-    if (this.state.currentPhase !== 'guessing') {
-      return { success: false, error: 'Not in guessing phase' };
-    }
-    
-    if (cardIndex < 0 || cardIndex >= 25) {
-      return { success: false, error: 'Invalid card index' };
-    }
-    
-    const card = this.state.cards[cardIndex];
-    if (!card) {
-      return { success: false, error: 'Card not found' };
-    }
-    if (card.revealed) {
-      return { success: false, error: 'Card already revealed' };
-    }
-    
-    // Reveal the card
-    card.revealed = true;
-    
-    const guess: Guess = {
-      cardIndex,
-      playerId,
-      team: player.team,
+  public async takeAction(
+    action: GameActionInput,
+  ): Promise<{ success: boolean; error?: string; gameState?: GameState }> {
+    this.ensureInitialized();
+
+    const type = action.data._type;
+    let result: { success: boolean; error?: string; gameState?: GameState } = {
+      success: false,
     };
-    
-    const action: GameAction = {
-      type: 'guess',
-      timestamp: new Date(),
-      playerId,
-      team: player.team,
-      data: guess,
-    };
-    
-    this.state.gameHistory.push(action);
-    this.state.updatedAt = new Date();
-    
-    // Check what type of card was revealed
-    const result = this.processGuess(card, player.team);
-    
+    if (type === "clue") {
+      result = await this.giveClue(
+        action.playerId,
+        action.data.word,
+        action.data.count,
+      );
+    } else if (type === "guess") {
+      result = await this.makeGuess(action.playerId, action.data.cardIndex);
+    } else if (type === "pass") {
+      result = await this.passTurn(action.playerId);
+    }
+
+    if (result.gameState)
+      await GameOrchestrator.handleGameStateChange(
+        this.gameId,
+        result.gameState,
+      );
+
     return result;
   }
 
-  private processGuess(card: Card, guessingTeam: Team): { success: boolean; gameOver?: boolean; error?: string } {
-    if (card.type === 'assassin') {
-      // Game over - guessing team loses
-      this.state.winner = guessingTeam === 'red' ? 'blue' : 'red';
-      this.state.currentPhase = 'game-over';
-      return { success: true, gameOver: true };
-    }
-    
-    if (card.type === guessingTeam) {
-      // Correct guess - update remaining agents and continue guessing
-      if (guessingTeam === 'red') {
-        this.state.redAgentsRemaining--;
-      } else {
-        this.state.blueAgentsRemaining--;
+  public async giveClue(
+    playerId: string,
+    word: string,
+    count: number,
+  ): Promise<{ success: boolean; error?: string }> {
+    this.ensureInitialized();
+
+    const player = this.getPlayer(playerId);
+    return await db.transaction(async (trx) => {
+      const state = await this.getState(trx);
+
+      if (!player) {
+        return { success: false, error: "Player not found" };
       }
-      
-      // Check for win condition
-      if (this.state.redAgentsRemaining === 0) {
-        this.state.winner = 'red';
-        this.state.currentPhase = 'game-over';
-        return { success: true, gameOver: true };
+
+      if (player.data.role !== "spymaster") {
+        return {
+          success: false,
+          error: "Only spymasters can give clues",
+        };
       }
-      
-      if (this.state.blueAgentsRemaining === 0) {
-        this.state.winner = 'blue';
-        this.state.currentPhase = 'game-over';
-        return { success: true, gameOver: true };
+
+      if (player.team !== state?.currentTeam) {
+        return { success: false, error: "Not your turn" };
       }
-      
-      // Continue guessing
-      this.state.remainingGuesses--;
-      if (this.state.remainingGuesses <= 0) {
-        this.endTurn();
+
+      if (state?.currentPhase !== "giving-clue") {
+        return {
+          success: false,
+          error: "Not in clue-giving phase",
+        };
       }
-      
-      return { success: true };
-    }
-    
-    // Wrong guess (neutral or enemy agent) - end turn
-    if (card.type !== 'neutral' && card.type !== guessingTeam) {
-      // Enemy agent - update their count
-      if (card.type === 'red') {
-        this.state.redAgentsRemaining--;
-      } else if (card.type === 'blue') {
-        this.state.blueAgentsRemaining--;
+
+      const clueValidation = CodenamesGameEngine.validateClue(
+        state,
+        word,
+        count,
+      );
+      if (!clueValidation.valid) {
+        return { success: false, error: clueValidation.error };
       }
-      
-      // Check for win condition
-      if (this.state.redAgentsRemaining === 0) {
-        this.state.winner = 'red';
-        this.state.currentPhase = 'game-over';
-        return { success: true, gameOver: true };
-      }
-      
-      if (this.state.blueAgentsRemaining === 0) {
-        this.state.winner = 'blue';
-        this.state.currentPhase = 'game-over';
-        return { success: true, gameOver: true };
-      }
-    }
-    
-    this.endTurn();
-    return { success: true };
+
+      const clue: Clue = {
+        _gameType,
+        _type: "clue",
+        word: word.toLowerCase(),
+        count,
+      };
+
+      await trx
+        .insert(gameActions)
+        .values({
+          gameId: this.gameId,
+          playerId,
+          team: player.team,
+          data: clue,
+        })
+        .returning();
+
+      const updatedState: GameState = {
+        ...state,
+        currentClue: clue,
+        currentPhase: "guessing",
+        remainingGuesses: count + 1,
+      };
+
+      // update game state
+      await db
+        .update(games)
+        .set({
+          gameState: updatedState,
+        })
+        .where(eq(games.id, this.gameId));
+
+      return {
+        success: true,
+        gameState: updatedState,
+      };
+    });
   }
 
-  public passTurn(playerId: string): { success: boolean; error?: string } {
-    const player = this.state.players.find(p => p.id === playerId);
-    
-    if (!player) {
-      return { success: false, error: 'Player not found' };
-    }
-    
-    if (player.team !== this.state.currentTeam) {
-      return { success: false, error: 'Not your turn' };
-    }
-    
-    if (this.state.currentPhase !== 'guessing') {
-      return { success: false, error: 'Can only pass during guessing phase' };
-    }
-    
-    const action: GameAction = {
-      type: 'pass',
-      timestamp: new Date(),
-      playerId,
-      team: player.team,
-      data: {},
-    };
-    
-    this.state.gameHistory.push(action);
-    this.endTurn();
-    
-    return { success: true };
+  public async makeGuess(
+    playerId: string,
+    cardIndex: number,
+  ): Promise<{ success: boolean; error?: string; gameState?: GameState }> {
+    this.ensureInitialized();
+
+    const player = this.getPlayer(playerId);
+
+    return await db.transaction(
+      async (
+        trx,
+      ): Promise<{
+        success: boolean;
+        error?: string;
+        gameState?: GameState;
+      }> => {
+        const state = await this.getState(trx);
+
+        if (!player) {
+          return { success: false, error: "Player not found" };
+        }
+
+        if (player.data.role !== "operative") {
+          return { success: false, error: "Only operatives can make guesses" };
+        }
+
+        if (player.team !== state?.currentTeam) {
+          return { success: false, error: "Not your turn" };
+        }
+
+        if (state?.currentPhase !== "guessing") {
+          return { success: false, error: "Not in guessing phase" };
+        }
+
+        if (cardIndex < 0 || cardIndex >= 25) {
+          return { success: false, error: "Invalid card index" };
+        }
+
+        const card = state?.cards[cardIndex];
+        if (!card) {
+          return { success: false, error: "Card not found" };
+        }
+        if (card.revealed) {
+          return { success: false, error: "Card already revealed" };
+        }
+
+        // Reveal the card
+        card.revealed = true;
+
+        const guess: Guess = {
+          _gameType,
+          _type: "guess",
+          cardIndex,
+        };
+
+        const action: GameAction = {
+          timestamp: new Date(),
+          playerId,
+          gameId: this.gameId,
+          team: player.team,
+          data: guess,
+        };
+
+        await trx.insert(gameActions).values(action);
+
+        // Check what type of card was revealed
+        const guessingTeam = player.team;
+        let result: {
+          success: boolean;
+          error?: string;
+          gameState?: GameState;
+        } = {
+          success: true,
+        };
+
+        if (card.type === "assassin") {
+          // Game over - guessing team loses
+          state.winner = guessingTeam === "red" ? "blue" : "red";
+          state.currentPhase = "game-over";
+          result = { success: true };
+        }
+
+        if (card.type === guessingTeam) {
+          // Correct guess - update remaining agents and continue guessing
+          if (guessingTeam === "red") {
+            state.redAgentsRemaining--;
+          } else {
+            state.blueAgentsRemaining--;
+          }
+
+          // Check for win condition
+          if (state.redAgentsRemaining === 0) {
+            state.winner = "red";
+            state.currentPhase = "game-over";
+            result = { success: true };
+          }
+
+          if (state.blueAgentsRemaining === 0) {
+            state.winner = "blue";
+            state.currentPhase = "game-over";
+            result = { success: true };
+          }
+
+          // Continue guessing
+          state.remainingGuesses--;
+          if (state.remainingGuesses <= 0) {
+            CodenamesGameEngine.endTurn(state);
+          }
+
+          result = { success: true };
+        }
+
+        // Wrong guess (neutral or enemy agent) - end turn
+        if (card.type !== "neutral" && card.type !== guessingTeam) {
+          // Enemy agent - update their count
+          if (card.type === "red") {
+            state.redAgentsRemaining--;
+          } else if (card.type === "blue") {
+            state.blueAgentsRemaining--;
+          }
+
+          // Check for win condition
+          if (state.redAgentsRemaining === 0) {
+            state.winner = "red";
+            state.currentPhase = "game-over";
+            result = { success: true };
+          }
+
+          if (state.blueAgentsRemaining === 0) {
+            state.winner = "blue";
+            state.currentPhase = "game-over";
+            result = { success: true };
+          }
+        }
+
+        await trx
+          .update(games)
+          .set({
+            gameState: state,
+          })
+          .where(eq(games.id, this.gameId));
+
+        return {
+          ...result,
+          gameState: state,
+        };
+      },
+    );
   }
 
-  private endTurn(): void {
-    this.state.currentTeam = this.state.currentTeam === 'red' ? 'blue' : 'red';
-    this.state.currentPhase = 'giving-clue';
-    this.state.currentClue = null;
-    this.state.remainingGuesses = 0;
-    this.state.updatedAt = new Date();
+  public async passTurn(
+    playerId: string,
+  ): Promise<{ success: boolean; error?: string; gameState?: GameState }> {
+    this.ensureInitialized();
+
+    const player = this.getPlayer(playerId);
+    return await db.transaction(async (trx) => {
+      const state = await this.getState(trx);
+
+      if (!player) {
+        return { success: false, error: "Player not found" };
+      }
+
+      if (player.team !== state?.currentTeam) {
+        return { success: false, error: "Not your turn" };
+      }
+
+      if (state?.currentPhase !== "guessing") {
+        return { success: false, error: "Can only pass during guessing phase" };
+      }
+
+      const action: GameAction = {
+        timestamp: new Date(),
+        playerId,
+        gameId: this.gameId,
+        team: player.team,
+        data: {
+          _gameType,
+          _type: "pass",
+        },
+      };
+
+      await trx.insert(gameActions).values(action);
+      CodenamesGameEngine.endTurn(state);
+      await trx
+        .update(games)
+        .set({
+          gameState: state,
+        })
+        .where(eq(games.id, this.gameId));
+
+      return { success: true, gameState: state };
+    });
   }
 
-  private validateClue(word: string, count: number): { valid: boolean; error?: string } {
+  private static endTurn(state: GameState): void {
+    state.currentTeam = state.currentTeam === "red" ? "blue" : "red";
+    state.currentPhase = "giving-clue";
+    state.currentClue = null;
+    state.remainingGuesses = 0;
+  }
+
+  private static validateClue(
+    state: GameState,
+    word: string,
+    count: number,
+  ): { valid: boolean; error?: string } {
     // Basic validation
     if (!word || word.trim().length === 0) {
-      return { valid: false, error: 'Clue word cannot be empty' };
+      if (count === 0) {
+        // Assume it was an AI error - pass
+        return { valid: true };
+      }
+
+      return { valid: false, error: "Clue word cannot be empty" };
     }
-    
+
     if (count < 0 || count > 9) {
-      return { valid: false, error: 'Count must be between 0 and 9' };
+      return { valid: false, error: "Count must be between 0 and 9" };
     }
-    
+
+    if (word.includes(" ")) {
+      return { valid: false, error: "Clue must be a single word" };
+    }
+
+    if (!wordExists(word)) {
+      return { valid: false, error: "Clue must be a valid English word" };
+    }
+
     const normalizedClue = word.toLowerCase().trim();
-    
+
     // Check if clue matches any visible word
-    const visibleWords = this.state.cards
-      .filter(card => !card.revealed)
-      .map(card => card.word.toLowerCase());
-      
-    if (visibleWords.includes(normalizedClue)) {
-      return { valid: false, error: 'Clue cannot be the same as a visible word' };
+    const visibleWords = state.cards
+      .filter((card) => !card.revealed)
+      .map((card) => card.word.toLowerCase());
+
+    if (
+      visibleWords.some(
+        (w) => w.includes(normalizedClue) || normalizedClue.includes(w),
+      )
+    ) {
+      return {
+        valid: false,
+        error: "Clue cannot be a substring of a visible word",
+      };
     }
-    
-    // TODO: Add more sophisticated validation (compound words, etc.)
-    
+
+    if (visibleWords.includes(normalizedClue)) {
+      return {
+        valid: false,
+        error: "Clue cannot be the same as a visible word",
+      };
+    }
+
     return { valid: true };
   }
 
   public static loadWords(): string[] {
     try {
-      const wordsPath = path.join(process.cwd(), 'data', 'words.txt');
-      const wordsContent = readFileSync(wordsPath, 'utf-8');
-      return wordsContent.trim().split('\n').map(word => word.trim()).filter(word => word.length > 0);
+      const wordsPath = path.join(process.cwd(), "data", "words.txt");
+      const wordsContent = readFileSync(wordsPath, "utf-8");
+      return wordsContent
+        .trim()
+        .split("\n")
+        .map((word) => word.trim())
+        .filter((word) => word.length > 0);
     } catch (error) {
-      console.error('Error loading words:', error);
+      console.error("Error loading words:", error);
       // Fallback words if file can't be loaded
-      return [
-        'APPLE', 'BANANA', 'CHERRY', 'DOG', 'ELEPHANT', 'FIRE', 'GUITAR', 'HOUSE',
-        'ICE', 'JUNGLE', 'KING', 'LION', 'MOON', 'NIGHT', 'OCEAN', 'PIANO',
-        'QUEEN', 'ROBOT', 'STAR', 'TREE', 'UMBRELLA', 'VIOLIN', 'WATER', 'XRAY', 'YELLOW'
-      ];
+      throw new Error("Failed to load words", { cause: error });
     }
   }
-} 
+}

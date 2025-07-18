@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { api } from "~/trpc/react";
-import type { Player, Card, GameState } from "~/lib/codenames/types";
+import type { Card, Player } from "~/lib/codenames/types";
 import Link from "next/link";
 import { useGameSocket } from "~/hooks/use-socket";
+import { api } from "~/trpc/react";
 
 export default function GamePage() {
   const params = useParams();
@@ -15,45 +15,6 @@ export default function GamePage() {
   const [clueCount, setClueCount] = useState(1);
   const [playerId, setPlayerId] = useState("");
   const [isSpectating, setIsSpectating] = useState(false);
-  const [aiThinking, setAiThinking] = useState(false);
-
-  // Get game state
-  const { data: gameState, refetch } = api.game.getGame.useQuery(
-    { gameId, playerId: playerId || "spectator" },
-    { enabled: !!gameId, refetchInterval: 2000 },
-  );
-
-  // Mutations
-  const giveClue = api.game.giveClue.useMutation({
-    onSuccess: () => {
-      setClueWord("");
-      setClueCount(1);
-      void refetch();
-    },
-  });
-
-  const makeGuess = api.game.makeGuess.useMutation({
-    onSuccess: () => {
-      void refetch();
-    },
-  });
-
-  const passTurn = api.game.passTurn.useMutation({
-    onSuccess: () => void refetch(),
-  });
-
-  // AI moves are now handled by the backend via WebSockets
-  // const triggerAIMove = api.ai.triggerAIMove.useMutation({
-  //   onSuccess: (data) => {
-  //     console.log("AI Move Result:", data);
-  //     setAiThinking(false);
-  //     void refetch();
-  //   },
-  //   onError: (error) => {
-  //     console.error("AI Move Error:", error);
-  //     setAiThinking(false);
-  //   },
-  // });
 
   // Set player ID from URL or localStorage
   useEffect(() => {
@@ -74,25 +35,56 @@ export default function GamePage() {
     }
   }, []);
 
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
   // Use WebSocket for real-time game updates
-  const {
-    gameState: socketGameState,
-    aiThinking: socketAiThinking,
-    connected: socketConnected,
-  } = useGameSocket(gameId);
+  const { gameState, setGameState, aiThinking, connected } =
+    useGameSocket(gameId);
 
-  // Prefer WebSocket state over polling state when available
-  const currentGameState =
-    socketConnected && socketGameState ? socketGameState : gameState;
+  const { refetch: fetchGame, isFetching: isFetchingGame } =
+    api.game.getGame.useQuery(
+      { gameId },
+      {
+        enabled: false,
+      },
+    );
 
-  // Use WebSocket AI thinking state
   useEffect(() => {
-    if (socketConnected) {
-      setAiThinking(socketAiThinking);
+    if (!gameState && !isFetchingGame) {
+      void fetchGame().then(({ data: game }) => {
+        if (game) {
+          setGameState(game.gameState);
+          setPlayers(game.players);
+        }
+      });
     }
-  }, [socketAiThinking, socketConnected]);
+  }, [gameState, fetchGame, isFetchingGame, setGameState]);
 
-  if (!currentGameState) {
+  const { mutateAsync: takeAction, isPending: isTakingAction } =
+    api.game.takeAction.useMutation({
+      onSuccess: (result) => {
+        if (result.gameState) {
+          setGameState(result.gameState);
+        }
+        if (result.error) {
+          setError(result.error);
+        }
+      },
+    });
+
+  if (!connected) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600"></div>
+          <p className="text-gray-600">Connecting to game...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!gameState) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-100">
         <div className="text-center">
@@ -110,48 +102,51 @@ export default function GamePage() {
     );
   }
 
-  const currentPlayer = currentGameState.players?.find(
-    (p: Player) => p.id === playerId,
-  );
-  const isMyTurn = currentPlayer?.team === currentGameState.currentTeam;
+  const currentPlayer = players.find((p) => p.id === playerId);
+  const isMyTurn = currentPlayer?.team === gameState.currentTeam;
   const canGiveClue =
     isMyTurn &&
-    currentPlayer?.role === "spymaster" &&
-    currentGameState.currentPhase === "giving-clue";
+    currentPlayer?.data.role === "spymaster" &&
+    gameState.currentPhase === "giving-clue";
   const canGuess =
     isMyTurn &&
-    currentPlayer?.role === "operative" &&
-    currentGameState.currentPhase === "guessing";
+    currentPlayer?.data.role === "operative" &&
+    gameState.currentPhase === "guessing";
 
   // Get current AI player info
-  const currentAIPlayer = currentGameState.players?.find(
+  const currentAIPlayer = players.find(
     (p) =>
-      p.team === currentGameState.currentTeam &&
+      p.team === gameState.currentTeam &&
       p.type === "ai" &&
-      ((currentGameState.currentPhase === "giving-clue" &&
-        p.role === "spymaster") ||
-        (currentGameState.currentPhase === "guessing" &&
-          p.role === "operative")),
+      ((gameState.currentPhase === "giving-clue" &&
+        p.data.role === "spymaster") ||
+        (gameState.currentPhase === "guessing" && p.data.role === "operative")),
   );
 
   const handleClueSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (clueWord.trim() && clueCount > 0) {
-      giveClue.mutate({
-        gameId,
+      takeAction({
         playerId,
-        word: clueWord.trim(),
-        count: clueCount,
+        data: {
+          _type: "clue",
+          _gameType: "codenames",
+          word: clueWord.trim(),
+          count: clueCount,
+        },
       });
     }
   };
 
   const handleCardClick = (cardIndex: number) => {
-    if (canGuess && !currentGameState.cards?.[cardIndex]?.revealed) {
-      makeGuess.mutate({
-        gameId,
+    if (canGuess && !gameState.cards?.[cardIndex]?.revealed) {
+      takeAction({
         playerId,
-        cardIndex,
+        data: {
+          _type: "guess",
+          _gameType: "codenames",
+          cardIndex,
+        },
       });
     }
   };
@@ -177,7 +172,7 @@ export default function GamePage() {
       }
     } else {
       // Unrevealed cards
-      if (currentPlayer?.role === "spymaster" || isSpectating) {
+      if (currentPlayer?.data.role === "spymaster" || isSpectating) {
         // Spymasters and spectators can see the types
         switch (card.type) {
           case "red":
@@ -220,7 +215,7 @@ export default function GamePage() {
                 <p className="text-sm text-gray-600">👁️ Spectating</p>
               ) : (
                 <p className="text-sm text-gray-600">
-                  You: {currentPlayer?.name} ({currentPlayer?.role})
+                  You: {currentPlayer?.name} ({currentPlayer?.data.role})
                 </p>
               )}
             </div>
@@ -231,26 +226,26 @@ export default function GamePage() {
             <div className="text-center">
               <p className="text-sm text-gray-600">Current Turn</p>
               <p
-                className={`text-lg font-semibold ${currentGameState.currentTeam === "red" ? "text-red-600" : "text-blue-600"}`}
+                className={`text-lg font-semibold ${gameState.currentTeam === "red" ? "text-red-600" : "text-blue-600"}`}
               >
-                {currentGameState.currentTeam?.toUpperCase()} TEAM
+                {gameState.currentTeam?.toUpperCase()} TEAM
               </p>
             </div>
             <div className="text-center">
               <p className="text-sm text-gray-600">Phase</p>
               <p className="text-lg font-semibold capitalize">
-                {currentGameState.currentPhase?.replace("-", " ")}
+                {gameState.currentPhase?.replace("-", " ")}
               </p>
             </div>
             <div className="text-center">
               <p className="text-sm text-gray-600">Remaining Agents</p>
               <p className="text-lg">
                 <span className="font-semibold text-red-600">
-                  Red: {currentGameState.redAgentsRemaining}
+                  Red: {gameState.redAgentsRemaining}
                 </span>
                 {" | "}
                 <span className="font-semibold text-blue-600">
-                  Blue: {currentGameState.blueAgentsRemaining}
+                  Blue: {gameState.blueAgentsRemaining}
                 </span>
               </p>
             </div>
@@ -263,11 +258,11 @@ export default function GamePage() {
                 Red Team
               </h3>
               <div className="space-y-1 text-xs">
-                {currentGameState.players
+                {players
                   ?.filter((p) => p.team === "red")
                   .map((p) => (
                     <div key={p.id} className="flex items-center">
-                      {p.type === "ai" ? "🤖" : "👤"} {p.name} ({p.role})
+                      {p.type === "ai" ? "🤖" : "👤"} {p.name} ({p.data.role})
                       {p.aiModel && (
                         <span className="ml-1 text-gray-500">
                           - {p.aiModel}
@@ -282,11 +277,11 @@ export default function GamePage() {
                 Blue Team
               </h3>
               <div className="space-y-1 text-xs">
-                {currentGameState.players
+                {players
                   ?.filter((p) => p.team === "blue")
                   .map((p) => (
                     <div key={p.id} className="flex items-center">
-                      {p.type === "ai" ? "🤖" : "👤"} {p.name} ({p.role})
+                      {p.type === "ai" ? "🤖" : "👤"} {p.name} ({p.data.role})
                       {p.aiModel && (
                         <span className="ml-1 text-gray-500">
                           - {p.aiModel}
@@ -298,7 +293,7 @@ export default function GamePage() {
             </div>
           </div>
 
-          {!currentGameState.winner && (
+          {!gameState.winner && (
             <>
               {/* Activity Indicator */}
               <div className="mb-4 rounded-lg border border-purple-300 bg-purple-100 p-3">
@@ -314,17 +309,17 @@ export default function GamePage() {
               {/* Current Clue */}
               <div className="mb-4 rounded-lg bg-gray-50 p-4">
                 <p className="h-6 text-center">
-                  {currentGameState.currentClue && (
+                  {gameState.currentClue && (
                     <>
                       <span className="text-sm text-gray-600">
                         Current Clue:{" "}
                       </span>
                       <span className="text-lg font-semibold">
-                        &quot;{currentGameState.currentClue.word.toUpperCase()}
-                        &quot; - {currentGameState.currentClue.count}
+                        &quot;{gameState.currentClue.word.toUpperCase()}
+                        &quot; - {gameState.currentClue.count}
                       </span>
                       <span className="ml-2 text-sm text-gray-600">
-                        ({currentGameState.remainingGuesses} guesses left)
+                        ({gameState.remainingGuesses} guesses left)
                       </span>
                     </>
                   )}
@@ -334,12 +329,12 @@ export default function GamePage() {
           )}
 
           {/* Winner */}
-          {currentGameState.winner && (
+          {gameState.winner && (
             <div
-              className={`mb-4 flex flex-col gap-2 rounded-lg p-4 text-center ${currentGameState.winner === "red" ? "bg-red-100 text-red-800" : "bg-blue-100 text-blue-800"}`}
+              className={`mb-4 flex flex-col gap-2 rounded-lg p-4 text-center ${gameState.winner === "red" ? "bg-red-100 text-red-800" : "bg-blue-100 text-blue-800"}`}
             >
               <h2 className="text-2xl font-bold">
-                {currentGameState.winner.toUpperCase()} TEAM WINS!
+                {gameState.winner.toUpperCase()} TEAM WINS!
               </h2>
               <Link
                 href="/"
@@ -354,7 +349,7 @@ export default function GamePage() {
         {/* Game Board */}
         <div className="mb-6 rounded-lg bg-white p-6 shadow-md">
           <div className="mb-6 grid grid-cols-5 gap-3">
-            {currentGameState.cards?.map((card, index) => (
+            {gameState.cards?.map((card, index) => (
               <div
                 key={index}
                 className={getCardClassName(card)}
@@ -406,17 +401,13 @@ export default function GamePage() {
                 </div>
                 <button
                   type="submit"
-                  disabled={giveClue.isPending}
+                  disabled={!canGiveClue}
                   className="rounded-md bg-blue-600 px-6 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
                 >
-                  {giveClue.isPending ? "Giving..." : "Give Clue"}
+                  {isTakingAction ? "Giving..." : "Give Clue"}
                 </button>
               </form>
-              {giveClue.error && (
-                <p className="mt-2 text-sm text-red-600">
-                  {giveClue.error.message}
-                </p>
-              )}
+              {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
             </div>
           )}
 
@@ -425,42 +416,46 @@ export default function GamePage() {
               <h3 className="mb-4 text-lg font-semibold">Make Your Guess</h3>
               <p className="mb-4 text-gray-600">
                 Click on a card to guess it. You have{" "}
-                {currentGameState.remainingGuesses} guesses remaining.
+                {gameState.remainingGuesses} guesses remaining.
               </p>
               <button
-                onClick={() => passTurn.mutate({ gameId, playerId })}
-                disabled={passTurn.isPending}
+                onClick={() =>
+                  takeAction({
+                    playerId,
+                    data: {
+                      _type: "pass",
+                      _gameType: "codenames",
+                    },
+                  })
+                }
+                disabled={isTakingAction}
                 className="rounded-md bg-gray-600 px-6 py-2 text-white hover:bg-gray-700 disabled:opacity-50"
               >
-                {passTurn.isPending ? "Passing..." : "Pass Turn"}
+                {isTakingAction ? "Passing..." : "Pass Turn"}
               </button>
-              {makeGuess.error && (
-                <p className="mt-2 text-sm text-red-600">
-                  {makeGuess.error.message}
-                </p>
-              )}
+              {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
             </div>
           )}
 
           {!isMyTurn &&
-            currentGameState.currentPhase !== "game-over" &&
+            gameState.currentPhase !== "game-over" &&
             !isSpectating && (
               <div className="text-center">
                 <p className="text-gray-600">
-                  Waiting for {currentGameState.currentTeam} team...
+                  Waiting for {gameState.currentTeam} team...
                 </p>
               </div>
             )}
 
-          {isSpectating && currentGameState.currentPhase !== "game-over" && (
+          {isSpectating && gameState.currentPhase !== "game-over" && (
             <div className="text-center">
               <p className="text-gray-600">
-                👁️ Spectating - {currentGameState.currentTeam} team&apos;s turn
+                👁️ Spectating - {gameState.currentTeam} team&apos;s turn
               </p>
               {currentAIPlayer && (
                 <p className="mt-2 text-sm text-gray-500">
-                  Current player: {currentAIPlayer.name} ({currentAIPlayer.role}
-                  )
+                  Current player: {currentAIPlayer.name} (
+                  {currentAIPlayer.data.role})
                 </p>
               )}
             </div>

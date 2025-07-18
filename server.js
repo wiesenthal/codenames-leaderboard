@@ -12,7 +12,7 @@ const port = parseInt(process.env.PORT || "3000", 10);
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
-app.prepare().then(() => {
+app.prepare().then(async () => {
   const httpServer = createServer((req, res) => {
     const parsedUrl = parse(req.url || "", true);
     handle(req, res, parsedUrl).catch((err) => {
@@ -37,32 +37,82 @@ app.prepare().then(() => {
   io.on("connection", (socket) => {
     console.log(`[Socket] Client connected: ${socket.id}`);
 
-    socket.on("joinGame", (gameId) => {
-      console.log(`[Socket] Client ${socket.id} joining game ${gameId}`);
-      socket.join(`game:${gameId}`);
+    socket.on("joinGame", async (gameId) => {
+      console.log(
+        `server.js [Socket] Client ${socket.id} joining game ${gameId}`,
+      );
+      void socket.join(`game:${gameId}`);
       socket.data.gameId = gameId;
     });
 
     socket.on("leaveGame", (gameId) => {
-      console.log(`[Socket] Client ${socket.id} leaving game ${gameId}`);
-      socket.leave(`game:${gameId}`);
+      console.log(
+        `server.js [Socket] Client ${socket.id} leaving game ${gameId}`,
+      );
+      void socket.leave(`game:${gameId}`);
       socket.data.gameId = undefined;
     });
 
     socket.on("subscribeToGameEndings", () => {
-      console.log(`[Socket] Client ${socket.id} subscribing to game endings`);
-      socket.join("game-endings");
+      console.log(
+        `server.js [Socket] Client ${socket.id} subscribing to game endings`,
+      );
+      void socket.join("game-endings");
     });
 
     socket.on("unsubscribeFromGameEndings", () => {
-      console.log(`[Socket] Client ${socket.id} unsubscribing from game endings`);
-      socket.leave("game-endings");
+      console.log(
+        `server.js [Socket] Client ${socket.id} unsubscribing from game endings`,
+      );
+      void socket.leave("game-endings");
     });
 
+    socket.on(
+      "takeAction",
+      async (
+        action,
+        callback,
+      ) => {
+        console.log(
+          `server.js [Socket] Client ${socket.id} taking action: ${JSON.stringify(action)}`,
+        );
+        const gameId = socket.data.gameId;
+        if (!gameId) {
+          console.error(
+            `server.js [Socket] Client ${socket.id} not in a game`,
+          );
+          callback({ success: false, error: "Not in a game" });
+          return;
+        }
+        const gameEngine = await global.__gameOrchestrator.getGameEngine(gameId);
+
+        // check that the client is the current player
+        const currentPlayer = await gameEngine.getCurrentPlayer();
+        if (currentPlayer?.id !== socket.id) {
+          console.error(
+            `server.js [Socket] Client ${socket.id} is not the current player`,
+          );
+          callback({ success: false, error: "Not the current player" });
+          return;
+        }
+
+        const result = await gameEngine.takeAction(action);
+        if (!result.success) {
+          console.error(`[Socket] Failed to take action: ${result.error}`);
+          callback({ success: false, error: result.error });
+          return;
+        }
+        callback({ success: true });
+      },
+    );
+
     socket.on("disconnect", () => {
-      console.log(`[Socket] Client disconnected: ${socket.id}`);
+      console.log(
+        `server.js [Socket] Client disconnected: ${socket.id}`,
+      );
     });
   });
+  console.log("[WebSocket] Socket.IO server initialized");
 
   httpServer.listen(port, () => {
     console.log(`> Ready on http://${hostname}:${port}`);
