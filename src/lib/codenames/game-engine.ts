@@ -457,6 +457,7 @@ export class CodenamesGameEngine {
               reason: "guessed_assassin",
               clue: state.currentClue,
               guess,
+              card,
             },
           });
         } else if (card.type === "neutral") {
@@ -473,6 +474,7 @@ export class CodenamesGameEngine {
               reason: "guessed_neutral",
               clue: state.currentClue,
               guess,
+              card,
             },
           });
           CodenamesGameEngine.endTurn(state);
@@ -500,6 +502,7 @@ export class CodenamesGameEngine {
                 reason: "victory",
                 clue: state.currentClue,
                 guess,
+                card,
               },
             });
           }
@@ -519,6 +522,7 @@ export class CodenamesGameEngine {
                 reason: "victory",
                 clue: state.currentClue,
                 guess,
+                card,
               },
             });
           }
@@ -538,6 +542,7 @@ export class CodenamesGameEngine {
                 reason: "ran_out_of_guesses",
                 clue: state.currentClue,
                 guess,
+                card,
               },
             });
             CodenamesGameEngine.endTurn(state);
@@ -576,6 +581,7 @@ export class CodenamesGameEngine {
               reason: "guessed_enemy",
               clue: state.currentClue,
               guess: null,
+              card,
             },
           });
           CodenamesGameEngine.endTurn(state);
@@ -649,6 +655,7 @@ export class CodenamesGameEngine {
           reason: "passed",
           clue: state.currentClue,
           guess: null,
+          card: null,
         },
       });
       CodenamesGameEngine.endTurn(state);

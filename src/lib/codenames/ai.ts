@@ -12,6 +12,7 @@ import type {
 import { openrouter } from "@openrouter/ai-sdk-provider";
 import { z } from "zod";
 import { CodenamesGameEngine } from "./game-engine";
+import { normalize } from "../utils/misc";
 
 export class CodenamesAI {
   private player: AIPlayer;
@@ -262,13 +263,12 @@ INSTRUCTIONS:
 1. Think about which cards might relate to the clue "${currentClue.word}"
 2. Consider the number ${currentClue.count} - this is how many cards your spymaster thinks relate
 3. Be cautious - wrong guesses help the enemy or might hit the assassin
-4. If you're unsure or have used up logical guesses, you should pass
+4. If you're unsure or have used up logical guesses, you should pass by returning an empty string or null for the word
 
 Respond with ONLY a JSON object in this format:
 {
   ${player.withReasoning ? `"reasoning": "think carefully before guessing",` : ""}
-  "cardIndex": number_from_list_above_or_-1_if_passing,
-  "shouldPass": boolean
+  "word": word_from_list_above_or_empty_string_if_passing,
 }`;
 
     try {
@@ -279,35 +279,22 @@ Respond with ONLY a JSON object in this format:
         temperature: 0.8,
         schema: z.object({
           ...(player.withReasoning ? { reasoning: z.string() } : {}),
-          cardIndex: z.number(),
-          shouldPass: z.boolean(),
+          word: z.string().nullable(),
         }),
       });
 
-      const { cardIndex, shouldPass } = object;
+      const { word } = object;
 
       console.log(
-        `${player.aiModel} generated guess: ${shouldPass ? "pass" : unrevealedCards[cardIndex]?.word} - ${player.withReasoning ? (object.reasoning as string) : ""}`,
+        `${player.aiModel} generated guess: ${word} - ${player.withReasoning ? (object.reasoning as string) : ""}`,
       );
 
       const additionalFields = player.withReasoning
-        ? { reasoning: object.reasoning }
+        ? { reasoning: object.reasoning as string }
         : {};
 
       // Validate response
-      if (shouldPass || cardIndex === -1) {
-        return {
-          _gameType: "codenames",
-          _type: "pass",
-          ...additionalFields,
-        };
-      }
-
-      if (
-        typeof cardIndex !== "number" ||
-        cardIndex < 0 ||
-        cardIndex >= unrevealedCards.length
-      ) {
+      if (!word || word.trim() === "") {
         return {
           _gameType: "codenames",
           _type: "pass",
@@ -316,15 +303,22 @@ Respond with ONLY a JSON object in this format:
       }
 
       // Map back to original card index
-      const originalCardIndex = gameState.cards.findIndex(
-        (card) =>
-          card.word === unrevealedCards[cardIndex]?.word && !card.revealed,
+      const cardIndex = gameState.cards.findIndex(
+        (card) => normalize(card.word) === normalize(word) && !card.revealed,
       );
+
+      if (cardIndex === -1) {
+        return {
+          _gameType: "codenames",
+          _type: "pass",
+          ...additionalFields,
+        };
+      }
 
       return {
         _gameType: "codenames",
         _type: "guess",
-        cardIndex: originalCardIndex,
+        cardIndex,
         ...additionalFields,
       };
     } catch (error) {

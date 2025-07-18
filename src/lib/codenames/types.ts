@@ -122,6 +122,7 @@ export type GuessingRoundEndedEventData = {
   _type: "guessing_round_ended";
   clue: Clue | null;
   guess: Guess | null;
+  card: Card | null;
   reason:
     | "passed"
     | "ran_out_of_guesses"
