@@ -31,7 +31,7 @@ export class CodenamesAI {
   async takeAction(
     gameState: GameState,
     gameHistory: GameAction[],
-    historyToInclude = 5,
+    historyToInclude = 10,
   ): Promise<GameActionInput> {
     const player = this.player;
     if (player.data.role === "spymaster") {
@@ -88,24 +88,6 @@ export class CodenamesAI {
     while (retries > 0) {
       try {
         const prompt = `You are playing Codenames as the ${myTeam} team spymaster. Your goal is to give a one-word clue that helps your operatives identify your team's cards while avoiding enemy cards, neutral cards, and especially the assassin.
-
-    
-  PREVIOUS GAME HISTORY:
-  ${gameHistory
-    .slice(-historyToInclude)
-    .map((action) => {
-      if (action.data._type === "clue") {
-        const clue = action.data;
-        return `- ${action.team} spymaster gave clue: "${clue.word}" - ${clue.count}`;
-      } else if (action.data._type === "guess") {
-        const guess = action.data;
-        const card = gameState.cards[guess.cardIndex];
-        return `- ${action.team} operative guessed: "${card?.word}" (was ${card?.type})`;
-      }
-      return `- ${action.team} ${action.data._type}`;
-    })
-    .join("\n")}
-
 
     GAME STATE:
     - Current turn: ${gameState.currentTeam} team (${gameState.currentTeam === myTeam ? "YOUR TURN" : "not your turn"})
@@ -167,7 +149,7 @@ export class CodenamesAI {
         );
 
         const additionalFields = player.withReasoning
-          ? { reasoning: object.reasoning }
+          ? { reasoning: object.reasoning as string }
           : {};
 
         const { valid, error } = CodenamesGameEngine.validateClue(
@@ -210,7 +192,7 @@ export class CodenamesAI {
   async generateOperativeGuess(
     gameState: GameState,
     gameHistory: GameAction[],
-    historyToInclude = 5,
+    historyToInclude = 10,
   ): Promise<Guess | Pass> {
     const player = this.player;
     if (!player || player.data.role !== "operative") {
@@ -220,6 +202,9 @@ export class CodenamesAI {
     const myTeam = player.team;
     const unrevealedCards = gameState.cards.filter((card) => !card.revealed);
     const currentClue = gameState.currentClue;
+
+    const usedGuesses =
+      (currentClue?.count ?? 0) + 1 - gameState.remainingGuesses;
 
     if (!currentClue || !unrevealedCards.length) {
       return {
@@ -232,8 +217,6 @@ export class CodenamesAI {
 
 CURRENT CLUE: "${currentClue.word}" - ${currentClue.count}
 This means your spymaster thinks ${currentClue.count} cards on the board relate to "${currentClue.word}".
-
-REMAINING GUESSES: ${gameState.remainingGuesses}
 
 UNREVEALED CARDS:
 ${unrevealedCards.map((card, index) => `${index}: ${card.word}`).join("\n")}
@@ -249,15 +232,21 @@ ${gameHistory
   .map((action) => {
     if (action.data._type === "clue") {
       const clue = action.data;
-      return `- ${action.team} spymaster gave clue: "${clue.word}" - ${clue.count}`;
+      return `- ${action.team} spymaster${
+        action.team === myTeam ? " (your team)" : ""
+      } gave clue: "${clue.word}" - ${clue.count}`;
     } else if (action.data._type === "guess") {
       const guess = action.data;
       const card = gameState.cards[guess.cardIndex];
-      return `- ${action.team} operative guessed: "${card?.word}" (was ${card?.type})`;
+      return `- ${action.team} operative${
+        action.team === myTeam ? " (you)" : ""
+      } guessed: "${card?.word}" (was ${card?.type})`;
     }
     return `- ${action.team} ${action.data._type}`;
   })
   .join("\n")}
+
+${usedGuesses ? `You already correctly identified ${usedGuesses} for this clue. ${usedGuesses === currentClue.count ? "The only reason to use your bonus guess is if you think you can identify a card from a previous hint which you didn't get earlier." : ""}` : ""}
 
 INSTRUCTIONS:
 1. Think about which cards might relate to the clue "${currentClue.word}"
