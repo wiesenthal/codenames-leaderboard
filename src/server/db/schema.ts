@@ -68,6 +68,7 @@ export const players = createTable(
     type: playerTypeEnum("player_type").notNull(), // human, ai
     aiModel: d.text(), // e.g., "gpt-4", "claude-3", null for humans
     withReasoning: d.boolean(),
+    systemPrompt: d.text(),
     data: jsonb("data").$type<PlayerData>().notNull(),
     createdAt: d
       .timestamp({ withTimezone: true })

@@ -147,6 +147,7 @@ export class CodenamesAI {
 
         const { object } = await generateObject({
           model: openrouter(player.aiModel),
+          system: player.systemPrompt || undefined, // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing
           prompt,
           temperature: 0.7,
           schema: z.object({
@@ -164,6 +165,10 @@ export class CodenamesAI {
           `${player.aiModel} generated clue: ${word} - ${count} - ${player.withReasoning ? (object.reasoning as string) : ""}`,
         );
 
+        const additionalFields = player.withReasoning
+          ? { reasoning: object.reasoning }
+          : {};
+
         const { valid, error } = CodenamesGameEngine.validateClue(
           gameState,
           word,
@@ -179,6 +184,7 @@ export class CodenamesAI {
           _type: "clue",
           word: word.toLowerCase().trim(),
           count,
+          ...additionalFields,
         };
       } catch (error) {
         lastError = error as Error;
@@ -268,6 +274,7 @@ Respond with ONLY a JSON object in this format:
     try {
       const { object } = await generateObject({
         model: openrouter(player.aiModel),
+        system: player.systemPrompt || undefined, // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing
         prompt,
         temperature: 0.8,
         schema: z.object({
@@ -283,11 +290,16 @@ Respond with ONLY a JSON object in this format:
         `${player.aiModel} generated guess: ${shouldPass ? "pass" : unrevealedCards[cardIndex]?.word} - ${player.withReasoning ? (object.reasoning as string) : ""}`,
       );
 
+      const additionalFields = player.withReasoning
+        ? { reasoning: object.reasoning }
+        : {};
+
       // Validate response
       if (shouldPass || cardIndex === -1) {
         return {
           _gameType: "codenames",
           _type: "pass",
+          ...additionalFields,
         };
       }
 
@@ -299,6 +311,7 @@ Respond with ONLY a JSON object in this format:
         return {
           _gameType: "codenames",
           _type: "pass",
+          ...additionalFields,
         };
       }
 
@@ -312,6 +325,7 @@ Respond with ONLY a JSON object in this format:
         _gameType: "codenames",
         _type: "guess",
         cardIndex: originalCardIndex,
+        ...additionalFields,
       };
     } catch (error) {
       console.error("AI Operative error:", error);

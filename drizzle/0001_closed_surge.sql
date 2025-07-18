@@ -1,0 +1,1 @@
+ALTER TABLE "codenames_leaderboard_player" ADD COLUMN "system_prompt" text;

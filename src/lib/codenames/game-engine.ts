@@ -240,11 +240,16 @@ export class CodenamesGameEngine {
         action.playerId,
         action.data.word,
         action.data.count,
+        action.data.reasoning,
       );
     } else if (type === "guess") {
-      result = await this.makeGuess(action.playerId, action.data.cardIndex);
+      result = await this.makeGuess(
+        action.playerId,
+        action.data.cardIndex,
+        action.data.reasoning,
+      );
     } else if (type === "pass") {
-      result = await this.passTurn(action.playerId);
+      result = await this.passTurn(action.playerId, action.data.reasoning);
     }
 
     if (result.gameState)
@@ -265,6 +270,7 @@ export class CodenamesGameEngine {
     playerId: string,
     word: string,
     count: number,
+    reasoning?: string,
   ): Promise<{ success: boolean; error?: string }> {
     this.ensureInitialized();
 
@@ -308,6 +314,7 @@ export class CodenamesGameEngine {
         _type: "clue",
         word: word.toLowerCase(),
         count,
+        reasoning,
       };
 
       const [gameAction] = await trx
@@ -362,6 +369,7 @@ export class CodenamesGameEngine {
   public async makeGuess(
     playerId: string,
     cardIndex: number,
+    reasoning?: string,
   ): Promise<{ success: boolean; error?: string; gameState?: GameState }> {
     this.ensureInitialized();
 
@@ -412,6 +420,7 @@ export class CodenamesGameEngine {
           _gameType,
           _type: "guess",
           cardIndex,
+          reasoning,
         };
 
         const action: GameAction = {
@@ -447,11 +456,11 @@ export class CodenamesGameEngine {
               _type: "guessing_round_ended",
               reason: "guessed_assassin",
               clue: state.currentClue,
+              guess,
             },
           });
         } else if (card.type === "neutral") {
           // Neutral card - end turn
-          CodenamesGameEngine.endTurn(state);
           await trx.insert(gameEvents).values({
             gameId: this.gameId,
             team: player.team,
@@ -463,8 +472,10 @@ export class CodenamesGameEngine {
               _type: "guessing_round_ended",
               reason: "guessed_neutral",
               clue: state.currentClue,
+              guess,
             },
           });
+          CodenamesGameEngine.endTurn(state);
         } else if (card.type === guessingTeam) {
           // Correct guess - update remaining agents and continue guessing
           if (guessingTeam === "red") {
@@ -488,6 +499,7 @@ export class CodenamesGameEngine {
                 _type: "guessing_round_ended",
                 reason: "victory",
                 clue: state.currentClue,
+                guess,
               },
             });
           }
@@ -506,6 +518,7 @@ export class CodenamesGameEngine {
                 _type: "guessing_round_ended",
                 reason: "victory",
                 clue: state.currentClue,
+                guess,
               },
             });
           }
@@ -513,7 +526,6 @@ export class CodenamesGameEngine {
           // Continue guessing
           state.remainingGuesses--;
           if (state.remainingGuesses <= 0) {
-            CodenamesGameEngine.endTurn(state);
             await trx.insert(gameEvents).values({
               gameId: this.gameId,
               team: player.team,
@@ -525,8 +537,10 @@ export class CodenamesGameEngine {
                 _type: "guessing_round_ended",
                 reason: "ran_out_of_guesses",
                 clue: state.currentClue,
+                guess,
               },
             });
+            CodenamesGameEngine.endTurn(state);
           }
         }
         // Enemy agent
@@ -550,7 +564,6 @@ export class CodenamesGameEngine {
           }
 
           // end turn
-          CodenamesGameEngine.endTurn(state);
           await trx.insert(gameEvents).values({
             gameId: this.gameId,
             team: player.team,
@@ -562,8 +575,10 @@ export class CodenamesGameEngine {
               _type: "guessing_round_ended",
               reason: "guessed_enemy",
               clue: state.currentClue,
+              guess: null,
             },
           });
+          CodenamesGameEngine.endTurn(state);
         }
 
         await trx
@@ -583,6 +598,7 @@ export class CodenamesGameEngine {
 
   public async passTurn(
     playerId: string,
+    reasoning?: string,
   ): Promise<{ success: boolean; error?: string; gameState?: GameState }> {
     this.ensureInitialized();
 
@@ -610,6 +626,7 @@ export class CodenamesGameEngine {
         data: {
           _gameType,
           _type: "pass",
+          reasoning,
         },
       };
 
@@ -620,7 +637,6 @@ export class CodenamesGameEngine {
 
       const actionId = gameAction?.id;
 
-      CodenamesGameEngine.endTurn(state);
       await trx.insert(gameEvents).values({
         gameId: this.gameId,
         team: player.team,
@@ -632,8 +648,10 @@ export class CodenamesGameEngine {
           _type: "guessing_round_ended",
           reason: "passed",
           clue: state.currentClue,
+          guess: null,
         },
       });
+      CodenamesGameEngine.endTurn(state);
 
       await trx
         .update(games)

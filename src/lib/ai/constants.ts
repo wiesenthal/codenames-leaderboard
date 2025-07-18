@@ -22,10 +22,10 @@ export const ALL_MODELS: AIModel[] = [
     tokenLimit: 128000,
   },
   {
-    id: "google/gemini-2.0-flash-001",
-    name: "Google: Gemini 2.0 Flash",
-    inputCost: 0.1,
-    outputCost: 0.4,
+    id: "google/gemini-2.5-flash",
+    name: "Google: Gemini 2.5 Flash",
+    inputCost: 0.3,
+    outputCost: 2.5,
     tokenLimit: 1048576,
   },
   {
@@ -85,10 +85,10 @@ export const ALL_MODELS: AIModel[] = [
     tokenLimit: 1048576,
   },
   {
-    id: "google/gemini-2.5-flash",
-    name: "Google: Gemini 2.5 Flash",
-    inputCost: 0.3,
-    outputCost: 2.5,
+    id: "google/gemini-2.0-flash-001",
+    name: "Google: Gemini 2.0 Flash",
+    inputCost: 0.1,
+    outputCost: 0.4,
     tokenLimit: 1048576,
   },
   {

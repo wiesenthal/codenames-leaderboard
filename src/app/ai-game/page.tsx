@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "~/trpc/react";
 import { useRouter } from "next/navigation";
 import type { Player } from "~/lib/codenames/types";
@@ -9,7 +9,14 @@ import { sleep } from "~/lib/utils/misc";
 type PlayerConfig = {
   aiModel: string;
   withReasoning: boolean;
+  systemPrompt?: string;
 };
+
+type PlayerRole =
+  | "redTeamSpymaster"
+  | "redTeamOperative"
+  | "blueTeamSpymaster"
+  | "blueTeamOperative";
 
 export default function AIGamePage() {
   const [players, setPlayers] = useState<{
@@ -19,20 +26,24 @@ export default function AIGamePage() {
     blueTeamOperative: PlayerConfig;
   }>({
     redTeamSpymaster: {
-      aiModel: "openai/gpt-4o-mini",
-      withReasoning: true,
+      aiModel: "google/gemini-2.5-flash",
+      withReasoning: false,
+      systemPrompt: ``,
     },
     redTeamOperative: {
-      aiModel: "openai/gpt-4o-mini",
-      withReasoning: true,
+      aiModel: "google/gemini-2.5-flash",
+      withReasoning: false,
+      systemPrompt: ``,
     },
     blueTeamSpymaster: {
-      aiModel: "openai/gpt-4o-mini",
-      withReasoning: true,
+      aiModel: "google/gemini-2.5-flash",
+      withReasoning: false,
+      systemPrompt: ``,
     },
     blueTeamOperative: {
-      aiModel: "openai/gpt-4o-mini",
-      withReasoning: true,
+      aiModel: "google/gemini-2.5-flash",
+      withReasoning: false,
+      systemPrompt: ``,
     },
   });
 
@@ -40,6 +51,12 @@ export default function AIGamePage() {
   const [gameIds, setGameIds] = useState<string[]>([]);
   const [gamesPlayers, setGamesPlayers] = useState<Player[][] | null>(null);
   const [numberOfGames, setNumberOfGames] = useState(1);
+
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentEditingRole, setCurrentEditingRole] =
+    useState<PlayerRole | null>(null);
+  const [tempPrompt, setTempPrompt] = useState("");
 
   const router = useRouter();
 
@@ -65,6 +82,32 @@ export default function AIGamePage() {
     },
   });
 
+  // Modal functions
+  const openPromptModal = (role: PlayerRole) => {
+    setCurrentEditingRole(role);
+    setTempPrompt(players[role].systemPrompt ?? "");
+    setIsModalOpen(true);
+  };
+
+  const closePromptModal = () => {
+    setIsModalOpen(false);
+    setCurrentEditingRole(null);
+    setTempPrompt("");
+  };
+
+  const savePrompt = () => {
+    if (currentEditingRole) {
+      setPlayers((prev) => ({
+        ...prev,
+        [currentEditingRole]: {
+          ...prev[currentEditingRole],
+          systemPrompt: tempPrompt,
+        },
+      }));
+    }
+    closePromptModal();
+  };
+
   const handleCreateAIvsAI = async () => {
     console.log("creating games", numberOfGames, label);
     await Promise.all(
@@ -87,6 +130,16 @@ export default function AIGamePage() {
     } else {
       return `/game/${gameId}?spectate=true`;
     }
+  };
+
+  const getRoleDisplayName = (role: PlayerRole) => {
+    const roleMap = {
+      redTeamSpymaster: "Red Team Spymaster",
+      redTeamOperative: "Red Team Operative",
+      blueTeamSpymaster: "Blue Team Spymaster",
+      blueTeamOperative: "Blue Team Operative",
+    };
+    return roleMap[role];
   };
 
   const getRoleName = (player: Player) => {
@@ -280,6 +333,17 @@ export default function AIGamePage() {
                             </option>
                           ))}
                         </select>
+                        {players.redTeamSpymaster.aiModel !== "human" && (
+                          <button
+                            type="button"
+                            onClick={() => openPromptModal("redTeamSpymaster")}
+                            className="mt-1 w-full rounded border border-red-300 bg-red-50 px-2 py-1 text-xs text-red-700 hover:bg-red-100"
+                          >
+                            {players.redTeamSpymaster.systemPrompt
+                              ? "Edit Prompt"
+                              : "Add Prompt"}
+                          </button>
+                        )}
                       </div>
                       <div>
                         <div className="mb-1 flex items-center justify-between">
@@ -331,6 +395,17 @@ export default function AIGamePage() {
                             </option>
                           ))}
                         </select>
+                        {players.redTeamOperative.aiModel !== "human" && (
+                          <button
+                            type="button"
+                            onClick={() => openPromptModal("redTeamOperative")}
+                            className="mt-1 w-full rounded border border-red-300 bg-red-50 px-2 py-1 text-xs text-red-700 hover:bg-red-100"
+                          >
+                            {players.redTeamOperative.systemPrompt
+                              ? "Edit Prompt"
+                              : "Add Prompt"}
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -392,6 +467,17 @@ export default function AIGamePage() {
                             </option>
                           ))}
                         </select>
+                        {players.blueTeamSpymaster.aiModel !== "human" && (
+                          <button
+                            type="button"
+                            onClick={() => openPromptModal("blueTeamSpymaster")}
+                            className="mt-1 w-full rounded border border-blue-300 bg-blue-50 px-2 py-1 text-xs text-blue-700 hover:bg-blue-100"
+                          >
+                            {players.blueTeamSpymaster.systemPrompt
+                              ? "Edit Prompt"
+                              : "Add Prompt"}
+                          </button>
+                        )}
                       </div>
                       <div>
                         <div className="mb-1 flex items-center justify-between">
@@ -445,6 +531,17 @@ export default function AIGamePage() {
                             </option>
                           ))}
                         </select>
+                        {players.blueTeamOperative.aiModel !== "human" && (
+                          <button
+                            type="button"
+                            onClick={() => openPromptModal("blueTeamOperative")}
+                            className="mt-1 w-full rounded border border-blue-300 bg-blue-50 px-2 py-1 text-xs text-blue-700 hover:bg-blue-100"
+                          >
+                            {players.blueTeamOperative.systemPrompt
+                              ? "Edit Prompt"
+                              : "Add Prompt"}
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -480,6 +577,74 @@ export default function AIGamePage() {
           </div>
         </div>
       </div>
+
+      {/* Prompt Editing Modal */}
+      {isModalOpen && currentEditingRole && (
+        <div
+          className={`fixed inset-0 z-50 flex items-center justify-center bg-black/10 backdrop-blur-sm`}
+          onClick={closePromptModal}
+        >
+          <div
+            className="mx-4 w-full max-w-2xl rounded-lg bg-white p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-800">
+                Edit System Prompt - {getRoleDisplayName(currentEditingRole)}
+              </h3>
+              <button
+                onClick={closePromptModal}
+                className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <svg
+                  className="h-6 w-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                System Prompt
+              </label>
+              <textarea
+                value={tempPrompt}
+                onChange={(e) => setTempPrompt(e.target.value)}
+                placeholder="Enter custom system prompt for this AI player..."
+                className="h-64 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                This prompt will be used to guide the AI&apos;s behavior for
+                this specific role.
+              </p>
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={closePromptModal}
+                className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={savePrompt}
+                className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+              >
+                Save Prompt
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

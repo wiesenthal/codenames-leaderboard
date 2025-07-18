@@ -86,18 +86,22 @@ export const gameRouter = createTRPCRouter({
           redTeamSpymaster: z.object({
             aiModel: z.string().optional(),
             withReasoning: z.boolean().optional(),
+            systemPrompt: z.string().optional(),
           }),
           redTeamOperative: z.object({
             aiModel: z.string().optional(),
             withReasoning: z.boolean().optional(),
+            systemPrompt: z.string().optional(),
           }),
           blueTeamSpymaster: z.object({
             aiModel: z.string().optional(),
             withReasoning: z.boolean().optional(),
+            systemPrompt: z.string().optional(),
           }),
           blueTeamOperative: z.object({
             aiModel: z.string().optional(),
             withReasoning: z.boolean().optional(),
+            systemPrompt: z.string().optional(),
           }),
         }),
       }),
@@ -129,6 +133,7 @@ export const gameRouter = createTRPCRouter({
               },
               aiModel: redTeamSpymaster.aiModel ?? null,
               withReasoning: redTeamSpymaster.withReasoning ?? false,
+              systemPrompt: redTeamSpymaster.systemPrompt,
             },
             {
               name: "AI Red Operative",
@@ -140,6 +145,7 @@ export const gameRouter = createTRPCRouter({
               },
               aiModel: redTeamOperative.aiModel ?? null,
               withReasoning: redTeamOperative.withReasoning ?? false,
+              systemPrompt: redTeamOperative.systemPrompt,
             },
             {
               name: "AI Blue Spymaster",
@@ -151,6 +157,7 @@ export const gameRouter = createTRPCRouter({
               },
               aiModel: blueTeamSpymaster.aiModel ?? null,
               withReasoning: blueTeamSpymaster.withReasoning ?? false,
+              systemPrompt: blueTeamSpymaster.systemPrompt,
             },
             {
               name: "AI Blue Operative",
@@ -162,6 +169,7 @@ export const gameRouter = createTRPCRouter({
               },
               aiModel: blueTeamOperative.aiModel ?? null,
               withReasoning: blueTeamOperative.withReasoning ?? false,
+              systemPrompt: blueTeamOperative.systemPrompt,
             },
           ],
         };

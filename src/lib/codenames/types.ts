@@ -27,6 +27,7 @@ export interface Player {
   data: PlayerData;
   aiModel: string | null; // OpenRouter model ID for AI players
   withReasoning: boolean | null;
+  systemPrompt: string | null;
 }
 
 export type AIPlayer = Player & {
@@ -67,6 +68,7 @@ export const ClueSchema = z.object({
   _type: z.literal("clue"),
   word: z.string(),
   count: z.number(),
+  reasoning: z.string().optional(),
 });
 
 export type Clue = z.infer<typeof ClueSchema>;
@@ -75,6 +77,7 @@ export const GuessSchema = z.object({
   _gameType: z.literal("codenames"),
   _type: z.literal("guess"),
   cardIndex: z.number(),
+  reasoning: z.string().optional(),
 });
 
 export type Guess = z.infer<typeof GuessSchema>;
@@ -82,6 +85,7 @@ export type Guess = z.infer<typeof GuessSchema>;
 export const PassSchema = z.object({
   _gameType: z.literal("codenames"),
   _type: z.literal("pass"),
+  reasoning: z.string().optional(),
 });
 
 export type Pass = z.infer<typeof PassSchema>;
@@ -113,10 +117,11 @@ export type SpymasterFailedEventData = {
   clue: Clue;
 };
 
-export type ClueRoundEndedEventData = {
+export type GuessingRoundEndedEventData = {
   _gameType: _gameType;
   _type: "guessing_round_ended";
   clue: Clue | null;
+  guess: Guess | null;
   reason:
     | "passed"
     | "ran_out_of_guesses"
@@ -126,4 +131,6 @@ export type ClueRoundEndedEventData = {
     | "victory";
 };
 
-export type GameEventData = SpymasterFailedEventData | ClueRoundEndedEventData;
+export type GameEventData =
+  | SpymasterFailedEventData
+  | GuessingRoundEndedEventData;
