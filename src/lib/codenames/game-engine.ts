@@ -11,6 +11,7 @@ import type {
   Player,
   Game,
   GameActionInput,
+  Pass,
 } from "./types";
 import { readFileSync } from "fs";
 import path from "path";
@@ -429,6 +430,9 @@ export class CodenamesGameEngine {
           cardIndex,
           reasoning,
           correctness,
+          clueWord: state.currentClue?.word,
+          clueCount: state.currentClue?.count,
+          remainingGuessesBefore: state.remainingGuesses,
         };
 
         const action: GameAction = {
@@ -463,7 +467,6 @@ export class CodenamesGameEngine {
               _gameType: "codenames",
               _type: "guessing_round_ended",
               reason: "guessed_assassin",
-              clue: state.currentClue,
               guess,
               card,
             },
@@ -480,14 +483,15 @@ export class CodenamesGameEngine {
               _gameType: "codenames",
               _type: "guessing_round_ended",
               reason: "guessed_neutral",
-              clue: state.currentClue,
               guess,
               card,
             },
           });
           CodenamesGameEngine.endTurn(state);
         } else if (card.type === guessingTeam) {
+          state.remainingGuesses--;
           // Correct guess - update remaining agents and continue guessing
+
           if (guessingTeam === "red") {
             state.redAgentsRemaining--;
           } else {
@@ -508,7 +512,6 @@ export class CodenamesGameEngine {
                 _gameType: "codenames",
                 _type: "guessing_round_ended",
                 reason: "victory",
-                clue: state.currentClue,
                 guess,
                 card,
               },
@@ -528,7 +531,6 @@ export class CodenamesGameEngine {
                 _gameType: "codenames",
                 _type: "guessing_round_ended",
                 reason: "victory",
-                clue: state.currentClue,
                 guess,
                 card,
               },
@@ -536,7 +538,6 @@ export class CodenamesGameEngine {
           }
 
           // Continue guessing
-          state.remainingGuesses--;
           if (state.remainingGuesses <= 0) {
             await trx.insert(gameEvents).values({
               gameId: this.gameId,
@@ -548,7 +549,6 @@ export class CodenamesGameEngine {
                 _gameType: "codenames",
                 _type: "guessing_round_ended",
                 reason: "ran_out_of_guesses",
-                clue: state.currentClue,
                 guess,
                 card,
               },
@@ -587,8 +587,7 @@ export class CodenamesGameEngine {
               _gameType: "codenames",
               _type: "guessing_round_ended",
               reason: "guessed_enemy",
-              clue: state.currentClue,
-              guess: null,
+              guess,
               card,
             },
           });
@@ -632,16 +631,21 @@ export class CodenamesGameEngine {
         return { success: false, error: "Can only pass during guessing phase" };
       }
 
+      const pass: Pass = {
+        _gameType,
+        _type: "pass",
+        reasoning,
+        clueWord: state.currentClue?.word,
+        clueCount: state.currentClue?.count,
+        remainingGuessesBefore: state.remainingGuesses,
+      };
+
       const action: GameAction = {
         timestamp: new Date(),
         playerId,
         gameId: this.gameId,
         team: player.team,
-        data: {
-          _gameType,
-          _type: "pass",
-          reasoning,
-        },
+        data: pass,
       };
 
       const [gameAction] = await trx
@@ -661,7 +665,7 @@ export class CodenamesGameEngine {
           _gameType: "codenames",
           _type: "guessing_round_ended",
           reason: "passed",
-          clue: state.currentClue,
+          pass,
           guess: null,
           card: null,
         },

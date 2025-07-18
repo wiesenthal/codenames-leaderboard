@@ -81,6 +81,9 @@ export const GuessSchema = z.object({
   correctness: z
     .enum(["correct", "incorrect", "neutral", "assassin"])
     .optional(),
+  clueWord: z.string().optional(),
+  clueCount: z.number().optional(),
+  remainingGuessesBefore: z.number().optional(),
 });
 
 export type Guess = z.infer<typeof GuessSchema>;
@@ -89,6 +92,9 @@ export const PassSchema = z.object({
   _gameType: z.literal("codenames"),
   _type: z.literal("pass"),
   reasoning: z.string().optional(),
+  clueWord: z.string().optional(),
+  clueCount: z.number().optional(),
+  remainingGuessesBefore: z.number().optional(),
 });
 
 export type Pass = z.infer<typeof PassSchema>;
@@ -123,9 +129,9 @@ export type SpymasterFailedEventData = {
 export type GuessingRoundEndedEventData = {
   _gameType: _gameType;
   _type: "guessing_round_ended";
-  clue: Clue | null;
   guess: Guess | null;
   card: Card | null;
+  pass?: Pass;
   reason:
     | "passed"
     | "ran_out_of_guesses"
