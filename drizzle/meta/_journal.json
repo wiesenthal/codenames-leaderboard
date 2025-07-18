@@ -15,6 +15,13 @@
       "when": 1752824752776,
       "tag": "0001_closed_surge",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1752829302166,
+      "tag": "0002_sloppy_mordo",
+      "breakpoints": true
     }
   ]
 }

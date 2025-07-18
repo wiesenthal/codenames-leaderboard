@@ -49,6 +49,7 @@ export const games = createTable(
   (t) => [
     index("status_idx").on(t.status),
     index("started_at_idx").on(t.startedAt),
+    index("archived_idx").on(t.archived),
   ],
 );
 

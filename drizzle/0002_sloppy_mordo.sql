@@ -1,0 +1,1 @@
+CREATE INDEX "archived_idx" ON "codenames_leaderboard_game" USING btree ("archived");
