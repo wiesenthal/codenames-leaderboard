@@ -78,6 +78,9 @@ export const GuessSchema = z.object({
   _type: z.literal("guess"),
   cardIndex: z.number(),
   reasoning: z.string().optional(),
+  correctness: z
+    .enum(["correct", "incorrect", "neutral", "assassin"])
+    .optional(),
 });
 
 export type Guess = z.infer<typeof GuessSchema>;

@@ -416,11 +416,19 @@ export class CodenamesGameEngine {
         // Reveal the card
         card.revealed = true;
 
+        const correctness = (() => {
+          if (card.type === "assassin") return "assassin";
+          if (card.type === player.team) return "correct";
+          if (card.type === "neutral") return "neutral";
+          return "incorrect";
+        })();
+
         const guess: Guess = {
           _gameType,
           _type: "guess",
           cardIndex,
           reasoning,
+          correctness,
         };
 
         const action: GameAction = {
