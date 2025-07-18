@@ -34,6 +34,11 @@ export const gameRouter = createTRPCRouter({
       return await GameOrchestrator.getGame(input.gameId);
     }),
 
+  checkIfAIMoveIsNeeded: publicProcedure.query(async () => {
+    await GameOrchestrator.checkIfAIMoveIsNeeded();
+    return true;
+  }),
+
   takeAction: publicProcedure
     .input(z.object({ gameId: z.string(), action: GameActionInputSchema }))
     .mutation(async ({ input }) => {
@@ -59,35 +64,42 @@ export const gameRouter = createTRPCRouter({
   createGame: publicProcedure
     .input(
       z.object({
-        redTeamSpymaster: z.object({
-          aiModel: z.string().optional(),
-          withReasoning: z.boolean().optional(),
-        }),
-        redTeamOperative: z.object({
-          aiModel: z.string().optional(),
-          withReasoning: z.boolean().optional(),
-        }),
-        blueTeamSpymaster: z.object({
-          aiModel: z.string().optional(),
-          withReasoning: z.boolean().optional(),
-        }),
-        blueTeamOperative: z.object({
-          aiModel: z.string().optional(),
-          withReasoning: z.boolean().optional(),
+        label: z.string().optional(),
+        players: z.object({
+          redTeamSpymaster: z.object({
+            aiModel: z.string().optional(),
+            withReasoning: z.boolean().optional(),
+          }),
+          redTeamOperative: z.object({
+            aiModel: z.string().optional(),
+            withReasoning: z.boolean().optional(),
+          }),
+          blueTeamSpymaster: z.object({
+            aiModel: z.string().optional(),
+            withReasoning: z.boolean().optional(),
+          }),
+          blueTeamOperative: z.object({
+            aiModel: z.string().optional(),
+            withReasoning: z.boolean().optional(),
+          }),
         }),
       }),
     )
     .mutation(
       async ({
         input: {
-          redTeamSpymaster,
-          redTeamOperative,
-          blueTeamSpymaster,
-          blueTeamOperative,
+          label,
+          players: {
+            redTeamSpymaster,
+            redTeamOperative,
+            blueTeamSpymaster,
+            blueTeamOperative,
+          },
         },
       }) => {
         const words = CodenamesGameEngine.loadWords();
         const config: GameConfig = {
+          label,
           words,
           players: [
             {

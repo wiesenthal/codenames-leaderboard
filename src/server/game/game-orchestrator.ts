@@ -12,7 +12,7 @@ import {
   safeEmitGameError as emitGameError,
 } from "../websocket/socket-emitters";
 import { db } from "../db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { games } from "../db/schema";
 import {
   CodenamesGameEngine,
@@ -23,6 +23,8 @@ import { CodenamesAI } from "../../lib/codenames/ai";
 // TODO: persist state of players in memory
 // Game orchestrator manages game state and AI moves
 export class GameOrchestrator {
+  static numAILoopsActive = 0;
+
   static async removeGame(gameId: string): Promise<void> {
     await db.update(games).set({ archived: true }).where(eq(games.id, gameId));
     console.log(`[Orchestrator] Game ${gameId} removed`);
@@ -33,7 +35,7 @@ export class GameOrchestrator {
   ): Promise<InitializedCodenamesGameEngine> {
     const gameEngine = await CodenamesGameEngine.init(gameConfig);
 
-    void this.checkAndTriggerAIMove(gameEngine.gameId);
+    void this.checkAndMarkAIToMove(gameEngine.gameId);
 
     return gameEngine;
   }
@@ -62,6 +64,9 @@ export class GameOrchestrator {
 
     // Check if game ended
     if (gameState.winner || gameState.currentPhase === "game-over") {
+      console.log(
+        `[Orchestrator] Game ended. Winner: ${gameState.winner ?? "unknown"}`,
+      );
       emitGameEnded(gameId, gameState.winner ?? "unknown");
       // update the game in the db
       await db
@@ -72,19 +77,14 @@ export class GameOrchestrator {
           completedAt: new Date(),
         })
         .where(eq(games.id, gameId));
-      return;
     }
 
     // Check if we need to trigger an AI move
-    await GameOrchestrator.checkAndTriggerAIMove(gameId);
+    await GameOrchestrator.checkAndMarkAIToMove(gameId);
   }
 
-  private static async checkAndTriggerAIMove(gameId: string): Promise<void> {
-    const gameEngine = new CodenamesGameEngine({
-      gameId,
-    });
-
-    await gameEngine.loadFromDb();
+  private static async checkAndMarkAIToMove(gameId: string): Promise<void> {
+    const gameEngine = await CodenamesGameEngine.initLoad(gameId);
 
     // Find the AI player who should move
     const currentPlayer = await gameEngine.getCurrentPlayer();
@@ -97,13 +97,67 @@ export class GameOrchestrator {
     }
 
     if (currentPlayer.type === "ai") {
-      console.log(
-        `[Orchestrator] Executing immediate AI move for ${currentPlayer.name} (${currentPlayer.team} ${currentPlayer.data.role})`,
-      );
+      // console.log(
+      //   `[Orchestrator] Executing immediate AI move for ${currentPlayer.name} (${currentPlayer.team} ${currentPlayer.data.role})`,
+      // );
 
       // Execute AI move immediately
-      void GameOrchestrator.executeAIMove(gameId, currentPlayer);
+      // void GameOrchestrator.executeAIMove(gameId, currentPlayer);
+      // Mark the game as needing an AI move
+      await db
+        .update(games)
+        .set({ shouldPromptAIMove: true })
+        .where(eq(games.id, gameId));
+      void this.checkIfAIMoveIsNeeded();
+    } else {
+      console.log(
+        `[Orchestrator] ENDING LOOP. Current player is not an AI player.`,
+      );
     }
+  }
+
+  // ai move loop
+  static async checkIfAIMoveIsNeeded(): Promise<void> {
+    // check if any games are marked as needing an ai move
+    const game = await db.query.games.findFirst({
+      where: eq(games.shouldPromptAIMove, true),
+      orderBy: ({ updatedAt }, { asc }) => [asc(updatedAt)],
+    });
+    if (!game) {
+      console.log(
+        `[Orchestrator] ENDING LOOP. No games are marked as needing an AI move. Active loops: ${this.numAILoopsActive}`,
+      );
+      return;
+    }
+    // update it if it is needed
+    const [updatedGame] = await db
+      .update(games)
+      .set({ shouldPromptAIMove: false })
+      .where(and(eq(games.id, game.id), eq(games.shouldPromptAIMove, true)))
+      .returning();
+
+    if (!updatedGame) {
+      console.log(
+        `[Orchestrator] Race condition met, no game updated, so retrying. Active loops: ${this.numAILoopsActive}`,
+      );
+      void this.checkIfAIMoveIsNeeded();
+      return;
+    }
+
+    const gameEngine = await CodenamesGameEngine.initLoad(game.id);
+    const currentPlayer = await gameEngine.getCurrentPlayer();
+    if (!currentPlayer) {
+      console.log(
+        `[Orchestrator] ENDING LOOP. No current player found. Active loops: ${this.numAILoopsActive}`,
+      );
+      return;
+    }
+    this.numAILoopsActive++;
+    console.log(
+      `[Orchestrator] Executing AI move. Active loops: ${this.numAILoopsActive}`,
+    );
+    await this.executeAIMove(game.id, currentPlayer);
+    this.numAILoopsActive--;
   }
 
   private static async executeAIMove(

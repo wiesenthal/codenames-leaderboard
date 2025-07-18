@@ -3,6 +3,8 @@
 import { api } from "~/trpc/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useEffect } from "react";
+import { useRefetchAIMoves } from "~/hooks/useRefetchAIMoves";
 
 export default function HomePage() {
   const router = useRouter();
@@ -12,6 +14,8 @@ export default function HomePage() {
   const deleteGame = api.game.deleteGame.useMutation({
     onSuccess: () => void listGames.refetch(),
   });
+
+  useRefetchAIMoves();
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">

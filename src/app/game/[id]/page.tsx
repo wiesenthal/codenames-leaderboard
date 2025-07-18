@@ -6,6 +6,7 @@ import type { Card, Player } from "~/lib/codenames/types";
 import Link from "next/link";
 import { useGameSocket } from "~/hooks/use-socket";
 import { api } from "~/trpc/react";
+import { useRefetchAIMoves } from "~/hooks/useRefetchAIMoves";
 
 export default function GamePage() {
   const params = useParams();
@@ -15,6 +16,8 @@ export default function GamePage() {
   const [clueCount, setClueCount] = useState(1);
   const [playerId, setPlayerId] = useState("");
   const [isSpectating, setIsSpectating] = useState(false);
+
+  useRefetchAIMoves();
 
   // Set player ID from URL or localStorage
   useEffect(() => {

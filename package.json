@@ -10,6 +10,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
+    "db:drop": "drizzle-kit drop",
     "dev": "node server.js",
     "dev:no-socket": "next dev --turbo",
     "preview": "next build && NODE_ENV=production node server.js",

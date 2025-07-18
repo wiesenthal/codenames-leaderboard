@@ -50,6 +50,7 @@ export class CodenamesGameEngine {
         .insert(games)
         .values({
           status: "active",
+          label: config.label,
           gameState,
         })
         .returning();
@@ -72,6 +73,14 @@ export class CodenamesGameEngine {
 
       return gameEngine as InitializedCodenamesGameEngine;
     });
+  }
+
+  public static async initLoad(
+    gameId: string,
+  ): Promise<InitializedCodenamesGameEngine> {
+    const gameEngine = new CodenamesGameEngine({ gameId });
+    await gameEngine.loadFromDb();
+    return gameEngine as InitializedCodenamesGameEngine;
   }
 
   public async loadFromDb(): Promise<Game> {
@@ -238,6 +247,11 @@ export class CodenamesGameEngine {
         this.gameId,
         result.gameState,
       );
+    else {
+      console.log(
+        `[GameEngine] No game state returned for action ${type} by player ${action.playerId}`,
+      );
+    }
 
     return result;
   }
@@ -525,7 +539,7 @@ export class CodenamesGameEngine {
     state.remainingGuesses = 0;
   }
 
-  private static validateClue(
+  public static validateClue(
     state: GameState,
     word: string,
     count: number,

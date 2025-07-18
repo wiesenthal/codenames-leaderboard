@@ -11,6 +11,7 @@ import type {
 } from "./types";
 import { openrouter } from "@openrouter/ai-sdk-provider";
 import { z } from "zod";
+import { CodenamesGameEngine } from "./game-engine";
 
 export class CodenamesAI {
   private player: AIPlayer;
@@ -163,21 +164,14 @@ export class CodenamesAI {
           `${player.aiModel} generated clue: ${word} - ${count} - ${player.withReasoning ? (object.reasoning as string) : ""}`,
         );
 
-        // validate response
-        // check if only one word
-        if (word.split(" ").length > 1) {
-          throw new Error("Clue must be a single word");
-        }
-        // check that word is not a subset of any word in the game state, or that any word in the game state is a subset of the clue
-        if (gameState.cards.some((card) => card.word.includes(word))) {
-          throw new Error(
-            "Clue cannot be a subset of any word in the game state",
-          );
-        }
-        if (gameState.cards.some((card) => word.includes(card.word))) {
-          throw new Error(
-            "Clue cannot be a superset of any word in the game state",
-          );
+        const { valid, error } = CodenamesGameEngine.validateClue(
+          gameState,
+          word,
+          count,
+        );
+
+        if (!valid) {
+          throw new Error(error ?? "Invalid clue");
         }
 
         return {
@@ -190,17 +184,15 @@ export class CodenamesAI {
         lastError = error as Error;
         retries--;
 
-        if (retries === 0) {
-          throw new Error(
-            `Failed to generate spymaster clue after attempts. error: ${lastError}`,
-          );
-        }
-
-        console.log(
-          `AI clue generation failed, retrying... (${retries} attempts left). Error: ${lastError.message}`,
-        );
+        // console.log(
+        //   `AI clue generation failed, retrying... (${retries} attempts left). Error: ${lastError.message}`,
+        // );
       }
     }
+
+    console.log(
+      `[AI] Failed to generate clue after ${historyToInclude} attempts. Error: ${lastError?.message ?? "Unknown error"}`,
+    );
 
     return {
       _gameType: "codenames",
@@ -290,11 +282,11 @@ Respond with ONLY a JSON object in this format:
       const { cardIndex, shouldPass } = object;
 
       console.log(
-        `${player.aiModel} generated guess: ${cardIndex} - ${player.withReasoning ? (object.reasoning as string) : ""}`,
+        `${player.aiModel} generated guess: ${shouldPass ? "pass" : unrevealedCards[cardIndex]?.word} - ${player.withReasoning ? (object.reasoning as string) : ""}`,
       );
 
       // Validate response
-      if (shouldPass) {
+      if (shouldPass || cardIndex === -1) {
         return {
           _gameType: "codenames",
           _type: "pass",

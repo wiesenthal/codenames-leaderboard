@@ -5,6 +5,7 @@ import { sql } from "drizzle-orm";
 import { index, pgTableCreator, jsonb, pgEnum } from "drizzle-orm/pg-core";
 import type {
   GameActionData,
+  GameEventData,
   GameState,
   PlayerData,
   Team,
@@ -24,21 +25,7 @@ export const playerTypeEnum = pgEnum("player_type", ["human", "ai"]);
  * @see https://orm.drizzle.team/docs/goodies#multi-project-schema
  */
 export const createTable = pgTableCreator(
-  (name) => `codenames-leaderboard_${name}`,
-);
-
-export const posts = createTable(
-  "post",
-  (d) => ({
-    id: d.integer().primaryKey().generatedByDefaultAsIdentity(),
-    name: d.varchar({ length: 256 }),
-    createdAt: d
-      .timestamp({ withTimezone: true })
-      .default(sql`CURRENT_TIMESTAMP`)
-      .notNull(),
-    updatedAt: d.timestamp({ withTimezone: true }).$onUpdate(() => new Date()),
-  }),
-  (t) => [index("name_idx").on(t.name)],
+  (name) => `codenames_leaderboard_${name}`,
 );
 
 // Game related tables
@@ -47,8 +34,10 @@ export const games = createTable(
   (d) => ({
     id: d.uuid().defaultRandom().primaryKey(),
     status: statusEnum("status").notNull().default("active"), // active, completed, abandoned
+    shouldPromptAIMove: d.boolean().notNull().default(false), // true if the game will prompt the ai to act. If the ai has been prompted to act, this will be false
     archived: d.boolean().notNull().default(false),
     gameState: jsonb("game_state").$type<GameState>().notNull(),
+    label: d.text(),
     winner: d.varchar({ length: 10 }).$type<Team>(), // red, blue, or null
     startedAt: d
       .timestamp({ withTimezone: true })
@@ -70,7 +59,10 @@ export const players = createTable(
     gameId: d
       .uuid()
       .notNull()
-      .references(() => games.id),
+      .references(() => games.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
     team: d.text().notNull(),
     name: d.varchar({ length: 256 }).notNull(),
     type: playerTypeEnum("player_type").notNull(), // human, ai
@@ -95,11 +87,14 @@ export const gameActions = createTable(
     gameId: d
       .uuid()
       .notNull()
-      .references(() => games.id),
+      .references(() => games.id, { onDelete: "cascade", onUpdate: "cascade" }),
     playerId: d
       .uuid()
       .notNull()
-      .references(() => players.id),
+      .references(() => players.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
     team: d.text().notNull(),
     data: jsonb("action_data").$type<GameActionData>().notNull(),
     timestamp: d

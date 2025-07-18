@@ -101,6 +101,38 @@ export type GameAction = GameActionInput & {
 };
 
 export interface GameConfig {
+  label?: string;
   words: string[];
   players: PlayerWithoutId[];
 }
+
+export type DeathWordGuessedEventData = {
+  _gameType: _gameType;
+  _type: "death_word_guessed";
+  deathWord: string;
+  clue: Clue;
+  gameState: GameState;
+};
+
+export type SpymasterFailedEventData = {
+  _gameType: _gameType;
+  _type: "spymaster_failed";
+  clue: Clue;
+  gameState: GameState;
+};
+
+export type ClueRoundEndedEventData = {
+  _gameType: _gameType;
+  _type: "clue_round_ended";
+  gameState: GameState;
+  reason:
+    | "operative_passed"
+    | "operative_guessed_neutral"
+    | "operative_guessed_enemy"
+    | "operative_guessed_death_word";
+};
+
+export type GameEventData =
+  | DeathWordGuessedEventData
+  | SpymasterFailedEventData
+  | ClueRoundEndedEventData;

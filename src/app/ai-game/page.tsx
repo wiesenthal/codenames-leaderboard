@@ -35,6 +35,7 @@ export default function AIGamePage() {
     },
   });
 
+  const [label, setLabel] = useState("");
   const [gameIds, setGameIds] = useState<string[]>([]);
   const [gamesPlayers, setGamesPlayers] = useState<Player[][] | null>(null);
   const [numberOfGames, setNumberOfGames] = useState(1);
@@ -64,9 +65,15 @@ export default function AIGamePage() {
   });
 
   const handleCreateAIvsAI = async () => {
-    for (let i = 0; i < numberOfGames; i++) {
-      await createGame.mutateAsync(players);
-    }
+    console.log("creating games", numberOfGames, label);
+    await Promise.all(
+      Array.from({ length: numberOfGames }).map(() =>
+        createGame.mutateAsync({
+          players,
+          label,
+        }),
+      ),
+    );
   };
 
   const getRoleLink = (player: Player, gameId: string | undefined) => {
@@ -207,6 +214,13 @@ export default function AIGamePage() {
                 <h3 className="mb-4 text-lg font-medium text-gray-800">
                   Battle Configuration
                 </h3>
+                <input
+                  type="text"
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                  placeholder="Enter a label for the game"
+                  className="mb-4 w-full rounded border border-gray-300 px-2 py-1 text-sm focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                />
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <h4 className="text-md mb-2 font-medium text-red-600">
@@ -440,7 +454,11 @@ export default function AIGamePage() {
                   disabled={createGame.isPending}
                   className="w-full rounded-md bg-indigo-600 px-6 py-3 font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {createGame.isPending ? "Creating Battle..." : "Start Game"}
+                  {createGame.isPending
+                    ? "Creating Battle..."
+                    : numberOfGames > 1
+                      ? "Start Games"
+                      : "Start Game"}
                 </button>
                 <input
                   type="number"

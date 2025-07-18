@@ -1,11 +1,11 @@
 {
-  "id": "f66e575f-cddd-45f9-9fc9-f8eb7dfa3536",
+  "id": "24f57ccf-0111-4741-b0b7-8e6c21f4c87f",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.codenames-leaderboard_game_action": {
-      "name": "codenames-leaderboard_game_action",
+    "public.codenames_leaderboard_game_action": {
+      "name": "codenames_leaderboard_game_action",
       "schema": "",
       "columns": {
         "id": {
@@ -15,7 +15,7 @@
           "notNull": true,
           "identity": {
             "type": "byDefault",
-            "name": "codenames-leaderboard_game_action_id_seq",
+            "name": "codenames_leaderboard_game_action_id_seq",
             "schema": "public",
             "increment": "1",
             "startWith": "1",
@@ -25,14 +25,14 @@
             "cycle": false
           }
         },
-        "gameId": {
-          "name": "gameId",
+        "game_id": {
+          "name": "game_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
-        "playerId": {
-          "name": "playerId",
+        "player_id": {
+          "name": "player_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -62,7 +62,7 @@
           "name": "game_action_game_idx",
           "columns": [
             {
-              "expression": "gameId",
+              "expression": "game_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -90,31 +90,31 @@
         }
       },
       "foreignKeys": {
-        "codenames-leaderboard_game_action_gameId_codenames-leaderboard_game_id_fk": {
-          "name": "codenames-leaderboard_game_action_gameId_codenames-leaderboard_game_id_fk",
-          "tableFrom": "codenames-leaderboard_game_action",
-          "tableTo": "codenames-leaderboard_game",
+        "codenames_leaderboard_game_action_game_id_codenames_leaderboard_game_id_fk": {
+          "name": "codenames_leaderboard_game_action_game_id_codenames_leaderboard_game_id_fk",
+          "tableFrom": "codenames_leaderboard_game_action",
+          "tableTo": "codenames_leaderboard_game",
           "columnsFrom": [
-            "gameId"
+            "game_id"
           ],
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
         },
-        "codenames-leaderboard_game_action_playerId_codenames-leaderboard_player_id_fk": {
-          "name": "codenames-leaderboard_game_action_playerId_codenames-leaderboard_player_id_fk",
-          "tableFrom": "codenames-leaderboard_game_action",
-          "tableTo": "codenames-leaderboard_player",
+        "codenames_leaderboard_game_action_player_id_codenames_leaderboard_player_id_fk": {
+          "name": "codenames_leaderboard_game_action_player_id_codenames_leaderboard_player_id_fk",
+          "tableFrom": "codenames_leaderboard_game_action",
+          "tableTo": "codenames_leaderboard_player",
           "columnsFrom": [
-            "playerId"
+            "player_id"
           ],
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -123,8 +123,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.codenames-leaderboard_game": {
-      "name": "codenames-leaderboard_game",
+    "public.codenames_leaderboard_game": {
+      "name": "codenames_leaderboard_game",
       "schema": "",
       "columns": {
         "id": {
@@ -142,6 +142,13 @@
           "notNull": true,
           "default": "'active'"
         },
+        "should_prompt_ai_move": {
+          "name": "should_prompt_ai_move",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "archived": {
           "name": "archived",
           "type": "boolean",
@@ -155,27 +162,33 @@
           "primaryKey": false,
           "notNull": true
         },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "winner": {
           "name": "winner",
           "type": "varchar(10)",
           "primaryKey": false,
           "notNull": false
         },
-        "startedAt": {
-          "name": "startedAt",
+        "started_at": {
+          "name": "started_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
           "default": "CURRENT_TIMESTAMP"
         },
-        "completedAt": {
-          "name": "completedAt",
+        "completed_at": {
+          "name": "completed_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
-        "updatedAt": {
-          "name": "updatedAt",
+        "updated_at": {
+          "name": "updated_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -201,7 +214,7 @@
           "name": "started_at_idx",
           "columns": [
             {
-              "expression": "startedAt",
+              "expression": "started_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -220,8 +233,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.codenames-leaderboard_player": {
-      "name": "codenames-leaderboard_player",
+    "public.codenames_leaderboard_player": {
+      "name": "codenames_leaderboard_player",
       "schema": "",
       "columns": {
         "id": {
@@ -231,8 +244,8 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "gameId": {
-          "name": "gameId",
+        "game_id": {
+          "name": "game_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -256,14 +269,14 @@
           "primaryKey": false,
           "notNull": true
         },
-        "aiModel": {
-          "name": "aiModel",
+        "ai_model": {
+          "name": "ai_model",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "withReasoning": {
-          "name": "withReasoning",
+        "with_reasoning": {
+          "name": "with_reasoning",
           "type": "boolean",
           "primaryKey": false,
           "notNull": false
@@ -274,8 +287,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "createdAt": {
-          "name": "createdAt",
+        "created_at": {
+          "name": "created_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
@@ -302,7 +315,7 @@
           "name": "ai_model_idx",
           "columns": [
             {
-              "expression": "aiModel",
+              "expression": "ai_model",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -315,85 +328,20 @@
         }
       },
       "foreignKeys": {
-        "codenames-leaderboard_player_gameId_codenames-leaderboard_game_id_fk": {
-          "name": "codenames-leaderboard_player_gameId_codenames-leaderboard_game_id_fk",
-          "tableFrom": "codenames-leaderboard_player",
-          "tableTo": "codenames-leaderboard_game",
+        "codenames_leaderboard_player_game_id_codenames_leaderboard_game_id_fk": {
+          "name": "codenames_leaderboard_player_game_id_codenames_leaderboard_game_id_fk",
+          "tableFrom": "codenames_leaderboard_player",
+          "tableTo": "codenames_leaderboard_game",
           "columnsFrom": [
-            "gameId"
+            "game_id"
           ],
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
         }
       },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.codenames-leaderboard_post": {
-      "name": "codenames-leaderboard_post",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "identity": {
-            "type": "byDefault",
-            "name": "codenames-leaderboard_post_id_seq",
-            "schema": "public",
-            "increment": "1",
-            "startWith": "1",
-            "minValue": "1",
-            "maxValue": "2147483647",
-            "cache": "1",
-            "cycle": false
-          }
-        },
-        "name": {
-          "name": "name",
-          "type": "varchar(256)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "createdAt": {
-          "name": "createdAt",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "CURRENT_TIMESTAMP"
-        },
-        "updatedAt": {
-          "name": "updatedAt",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "name_idx": {
-          "name": "name_idx",
-          "columns": [
-            {
-              "expression": "name",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
