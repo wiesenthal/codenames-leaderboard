@@ -1,3 +1,4 @@
+import type { JSONValue } from "ai";
 import { z } from "zod";
 
 export type Team = string; // red | blue
@@ -18,6 +19,8 @@ export interface PlayerData {
   role: "spymaster" | "operative";
 }
 
+export type ProviderOptions = Record<string, Record<string, JSONValue>>;
+
 export interface Player {
   id: string;
   gameId: string;
@@ -25,9 +28,11 @@ export interface Player {
   type: PlayerType;
   team: Team;
   data: PlayerData;
+  // AI player fields
   aiModel: string | null; // OpenRouter model ID for AI players
   withReasoning: boolean | null;
   systemPrompt: string | null;
+  providerOptions?: ProviderOptions;
 }
 
 export type AIPlayer = Player & {

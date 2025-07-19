@@ -22,6 +22,13 @@
       "when": 1752829302166,
       "tag": "0002_sloppy_mordo",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1752880724567,
+      "tag": "0003_productive_pete_wisdom",
+      "breakpoints": true
     }
   ]
 }

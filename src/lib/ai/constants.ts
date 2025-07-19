@@ -393,8 +393,23 @@ export const ALL_MODELS: AIModel[] = [
     tokenLimit: 163840,
   },
   {
+    id: "openai/o3",
+    name: "OpenAI: o3",
+    inputCost: 2,
+    outputCost: 8,
+    tokenLimit: 200000,
+  },
+  {
     id: "openai/o4-mini",
     name: "OpenAI: o4 Mini",
+    inputCost: 1.1,
+    outputCost: 4.4,
+    tokenLimit: 200000,
+  },
+
+  {
+    id: "openai/o3-mini",
+    name: "OpenAI: o3 Mini",
     inputCost: 1.1,
     outputCost: 4.4,
     tokenLimit: 200000,
@@ -433,13 +448,6 @@ export const ALL_MODELS: AIModel[] = [
     inputCost: 0.7,
     outputCost: 0.8,
     tokenLimit: 131072,
-  },
-  {
-    id: "openai/o3-mini",
-    name: "OpenAI: o3 Mini",
-    inputCost: 1.1,
-    outputCost: 4.4,
-    tokenLimit: 200000,
   },
   {
     id: "nousresearch/hermes-3-llama-3.1-70b",
@@ -772,4 +780,4 @@ export const ALL_MODELS: AIModel[] = [
   },
 ];
 
-export const AVAILABLE_MODELS = ALL_MODELS.slice(0, 25);
+export const AVAILABLE_MODELS = ALL_MODELS.slice(0, 100);

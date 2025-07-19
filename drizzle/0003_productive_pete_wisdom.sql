@@ -1,0 +1,1 @@
+ALTER TABLE "codenames_leaderboard_player" ADD COLUMN "provider_options" jsonb;

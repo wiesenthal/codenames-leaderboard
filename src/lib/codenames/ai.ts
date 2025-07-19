@@ -127,8 +127,8 @@ export class CodenamesAI {
 
     ${lastError ? `Your previous clue: ${previousClues.at(-1)} were invalid. Last error: ${lastError.message}` : ""}
     `;
-
-        const { object } = await generateObject({
+        console.log(`[AI] generating spymaster clue with ${player.aiModel}`);
+        const { object, providerMetadata, response } = await generateObject({
           model: openrouter(player.aiModel),
           system: player.systemPrompt || undefined, // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing
           prompt,
@@ -138,7 +138,18 @@ export class CodenamesAI {
             word: z.string(),
             count: z.number(),
           }),
+          providerOptions: player.providerOptions ?? undefined,
         });
+
+        if (providerMetadata) {
+          console.log(
+            `[AI] Provider metadata: ${JSON.stringify(providerMetadata, null, 2)}`,
+          );
+        }
+
+        // if (response) {
+        //   console.log(`[AI] Response: ${JSON.stringify(response, null, 2)}`);
+        // }
 
         const { word, count } = object;
 
@@ -252,12 +263,14 @@ INSTRUCTIONS:
 1. Think about which cards might relate to the clue "${currentClue.word}"
 2. Consider the number ${currentClue.count} - this is how many cards your spymaster thinks relate
 3. Be cautious - wrong guesses help the enemy or might hit the assassin
-4. If you're unsure or have used up logical guesses, you should pass by returning an empty string or null for the word
+4. If you're unsure or have used up logical guesses
+   (a) How to pass: Return an empty string for the word, and set shouldPass to true
 
 Respond with ONLY a JSON object in this format:
 {
   ${player.withReasoning ? `"reasoning": "think carefully before guessing",` : ""}
   "word": word_from_list_above_or_empty_string_if_passing,
+  "shouldPass": boolean
 }`;
 
     try {
@@ -269,6 +282,7 @@ Respond with ONLY a JSON object in this format:
         schema: z.object({
           ...(player.withReasoning ? { reasoning: z.string() } : {}),
           word: z.string().nullable(),
+          shouldPass: z.boolean(),
         }),
       });
 
@@ -283,7 +297,7 @@ Respond with ONLY a JSON object in this format:
         : {};
 
       // Validate response
-      if (!word || word.trim() === "") {
+      if (!word || word.trim() === "" || object.shouldPass) {
         return {
           _gameType: "codenames",
           _type: "pass",
