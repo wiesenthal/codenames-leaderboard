@@ -5,12 +5,14 @@ import { api } from "~/trpc/react";
 import { useRouter } from "next/navigation";
 import type { Player } from "~/lib/codenames/types";
 import { sleep } from "~/lib/utils/misc";
+import type { JSONValue } from "ai";
 
 type PlayerConfig = {
   aiModel: string;
   withReasoning: boolean;
   systemPrompt?: string;
   alwaysPassOnBonusGuess?: boolean;
+  providerOptions?: Record<string, Record<string, JSONValue>>;
 };
 
 type PlayerRole =
@@ -283,52 +285,52 @@ export default function AIGamePage() {
                   className="mb-4 w-full rounded border border-gray-300 px-2 py-1 text-sm focus:ring-1 focus:ring-indigo-500 focus:outline-none"
                 />
                 <div className="flex flex-row justify-between">
-                <div className="flex items-start w-1/2">
-                  <input // For now I am just going to have all players have the same alwaysPassOnBonusGuess
-                    type="checkbox"
-                    id="alwaysPassOnBonusGuess"
-                    checked={players.redTeamOperative.alwaysPassOnBonusGuess}
-                    onChange={(e) => {
-                      setPlayers((prev) => ({
-                        ...prev,
-                        redTeamOperative: {
-                          ...prev.redTeamOperative,
-                          alwaysPassOnBonusGuess: e.target.checked,
-                        },
-                      }));
-                    }}
-                    className="mr-1 h-3 w-3 text-green-600 focus:ring-green-500"
-                  />
-                  <label
-                    htmlFor="blueOperativeReasoningAI"
-                    className="text-xs text-red-600 "
-                  >
-                    Always Pass on Bonus Guess
-                  </label>
-                </div>
-                <div className="flex items-start w-1/2">
-                  <input
-                    type="checkbox"
-                    id="alwaysPassOnBonusGuess"
-                    checked={players.blueTeamOperative.alwaysPassOnBonusGuess}
-                    onChange={(e) => {
-                      setPlayers((prev) => ({
-                        ...prev,
-                        blueTeamOperative: {
-                          ...prev.blueTeamOperative,
-                          alwaysPassOnBonusGuess: e.target.checked,
-                        },
-                      }));
-                    }}
-                    className="mr-1 h-3 w-3 text-green-600 focus:ring-green-500"
-                  />
-                  <label
-                    htmlFor="bluealwaysPassOnBonusGuess"
-                    className="text-xs text-blue-600"
-                  >
-                    Always Pass on Bonus Guess
-                  </label>
-                </div>
+                  <div className="flex w-1/2 items-start">
+                    <input // For now I am just going to have all players have the same alwaysPassOnBonusGuess
+                      type="checkbox"
+                      id="alwaysPassOnBonusGuess"
+                      checked={players.redTeamOperative.alwaysPassOnBonusGuess}
+                      onChange={(e) => {
+                        setPlayers((prev) => ({
+                          ...prev,
+                          redTeamOperative: {
+                            ...prev.redTeamOperative,
+                            alwaysPassOnBonusGuess: e.target.checked,
+                          },
+                        }));
+                      }}
+                      className="mr-1 h-3 w-3 text-green-600 focus:ring-green-500"
+                    />
+                    <label
+                      htmlFor="blueOperativeReasoningAI"
+                      className="text-xs text-red-600"
+                    >
+                      Always Pass on Bonus Guess
+                    </label>
+                  </div>
+                  <div className="flex w-1/2 items-start">
+                    <input
+                      type="checkbox"
+                      id="alwaysPassOnBonusGuess"
+                      checked={players.blueTeamOperative.alwaysPassOnBonusGuess}
+                      onChange={(e) => {
+                        setPlayers((prev) => ({
+                          ...prev,
+                          blueTeamOperative: {
+                            ...prev.blueTeamOperative,
+                            alwaysPassOnBonusGuess: e.target.checked,
+                          },
+                        }));
+                      }}
+                      className="mr-1 h-3 w-3 text-green-600 focus:ring-green-500"
+                    />
+                    <label
+                      htmlFor="bluealwaysPassOnBonusGuess"
+                      className="text-xs text-blue-600"
+                    >
+                      Always Pass on Bonus Guess
+                    </label>
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -681,6 +683,55 @@ export default function AIGamePage() {
                 This prompt will be used to guide the AI&apos;s behavior for
                 this specific role.
               </p>
+            </div>
+
+            <div>
+              {/* Provider Options */}
+              <div className="mb-4">
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Anthropic Reasoning
+                </label>
+                <div className="space-y-2">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={
+                        !!players[currentEditingRole]?.providerOptions
+                          ?.anthropic?.thinking
+                      }
+                      onChange={(e) => {
+                        setPlayers((prev) => ({
+                          ...prev,
+                          [currentEditingRole]: {
+                            ...prev[currentEditingRole],
+                            providerOptions: e.target.checked
+                              ? {
+                                  ...prev[currentEditingRole].providerOptions,
+                                  anthropic: {
+                                    thinking: {
+                                      type: "enabled",
+                                      budgetTokens: 500,
+                                    },
+                                  },
+                                }
+                              : {
+                                  ...prev[currentEditingRole].providerOptions,
+                                  anthropic: undefined,
+                                },
+                          },
+                        }));
+                      }}
+                      className="mr-2 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span className="text-sm text-gray-700">
+                      Enable Anthropic thinking (12k token budget)
+                    </span>
+                  </label>
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  Configure provider-specific options for this AI player.
+                </p>
+              </div>
             </div>
 
             <div className="flex justify-end space-x-3">

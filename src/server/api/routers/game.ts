@@ -89,24 +89,36 @@ export const gameRouter = createTRPCRouter({
             withReasoning: z.boolean().optional(),
             systemPrompt: z.string().optional(),
             alwaysPassOnBonusGuess: z.boolean().optional(),
+            providerOptions: z
+              .record(z.string(), z.record(z.string(), z.any()))
+              .optional(),
           }),
           redTeamOperative: z.object({
             aiModel: z.string().optional(),
             withReasoning: z.boolean().optional(),
             systemPrompt: z.string().optional(),
             alwaysPassOnBonusGuess: z.boolean().optional(),
+            providerOptions: z
+              .record(z.string(), z.record(z.string(), z.any()))
+              .optional(),
           }),
           blueTeamSpymaster: z.object({
             aiModel: z.string().optional(),
             withReasoning: z.boolean().optional(),
             systemPrompt: z.string().optional(),
             alwaysPassOnBonusGuess: z.boolean().optional(),
+            providerOptions: z
+              .record(z.string(), z.record(z.string(), z.any()))
+              .optional(),
           }),
           blueTeamOperative: z.object({
             aiModel: z.string().optional(),
             withReasoning: z.boolean().optional(),
             systemPrompt: z.string().optional(),
             alwaysPassOnBonusGuess: z.boolean().optional(),
+            providerOptions: z
+              .record(z.string(), z.record(z.string(), z.any()))
+              .optional(),
           }),
         }),
       }),
@@ -140,6 +152,7 @@ export const gameRouter = createTRPCRouter({
               aiModel: redTeamSpymaster.aiModel ?? null,
               withReasoning: redTeamSpymaster.withReasoning ?? false,
               systemPrompt: redTeamSpymaster.systemPrompt ?? null,
+              providerOptions: redTeamSpymaster.providerOptions,
             },
             {
               name: "AI Red Operative",
@@ -153,6 +166,7 @@ export const gameRouter = createTRPCRouter({
               aiModel: redTeamOperative.aiModel ?? null,
               withReasoning: redTeamOperative.withReasoning ?? false,
               systemPrompt: redTeamOperative.systemPrompt ?? null,
+              providerOptions: redTeamOperative.providerOptions,
             },
             {
               name: "AI Blue Spymaster",
@@ -161,11 +175,13 @@ export const gameRouter = createTRPCRouter({
               data: {
                 _gameType: "codenames",
                 role: "spymaster",
-                alwaysPassOnBonusGuess: blueTeamSpymaster.alwaysPassOnBonusGuess,
+                alwaysPassOnBonusGuess:
+                  blueTeamSpymaster.alwaysPassOnBonusGuess,
               },
               aiModel: blueTeamSpymaster.aiModel ?? null,
               withReasoning: blueTeamSpymaster.withReasoning ?? false,
               systemPrompt: blueTeamSpymaster.systemPrompt ?? null,
+              providerOptions: blueTeamSpymaster.providerOptions,
             },
             {
               name: "AI Blue Operative",
@@ -174,11 +190,13 @@ export const gameRouter = createTRPCRouter({
               data: {
                 _gameType: "codenames",
                 role: "operative",
-                alwaysPassOnBonusGuess: blueTeamOperative.alwaysPassOnBonusGuess,
+                alwaysPassOnBonusGuess:
+                  blueTeamOperative.alwaysPassOnBonusGuess,
               },
               aiModel: blueTeamOperative.aiModel ?? null,
               withReasoning: blueTeamOperative.withReasoning ?? false,
               systemPrompt: blueTeamOperative.systemPrompt ?? null,
+              providerOptions: blueTeamOperative.providerOptions,
             },
           ],
         };
