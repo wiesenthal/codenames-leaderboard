@@ -129,13 +129,16 @@ export default function GamePage() {
   const handleClueSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (clueWord.trim() && clueCount > 0) {
-      takeAction({
-        playerId,
-        data: {
-          _type: "clue",
-          _gameType: "codenames",
-          word: clueWord.trim(),
-          count: clueCount,
+      void takeAction({
+        gameId,
+        action: {
+          playerId,
+          data: {
+            _type: "clue",
+            _gameType: "codenames",
+            word: clueWord.trim(),
+            count: clueCount,
+          },
         },
       });
     }
@@ -143,12 +146,15 @@ export default function GamePage() {
 
   const handleCardClick = (cardIndex: number) => {
     if (canGuess && !gameState.cards?.[cardIndex]?.revealed) {
-      takeAction({
-        playerId,
-        data: {
-          _type: "guess",
-          _gameType: "codenames",
-          cardIndex,
+      void takeAction({
+        gameId,
+        action: {
+          playerId,
+          data: {
+            _type: "guess",
+            _gameType: "codenames",
+            cardIndex,
+          },
         },
       });
     }
@@ -424,10 +430,13 @@ export default function GamePage() {
               <button
                 onClick={() =>
                   takeAction({
-                    playerId,
-                    data: {
-                      _type: "pass",
-                      _gameType: "codenames",
+                    gameId,
+                    action: {
+                      playerId,
+                      data: {
+                        _type: "pass",
+                        _gameType: "codenames",
+                      },
                     },
                   })
                 }

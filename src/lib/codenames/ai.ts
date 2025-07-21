@@ -217,10 +217,21 @@ export class CodenamesAI {
     const usedGuesses =
       (currentClue?.count ?? 0) + 1 - gameState.remainingGuesses;
 
-    if (!currentClue || !unrevealedCards.length) {
+    if (!currentClue || currentClue.word === "") {
       return {
         _gameType: "codenames",
         _type: "pass",
+        reasoning: `__SYSTEM__: currentClue is null or word is empty ${JSON.stringify(
+          currentClue,
+        )}`,
+      };
+    }
+
+    if (player.data.alwaysPassOnBonusGuess && usedGuesses === currentClue.count) {
+      return {
+        _gameType: "codenames",
+        _type: "pass",
+        reasoning: `__SYSTEM__: alwaysPassOnBonusGuess is true`,
       };
     }
 

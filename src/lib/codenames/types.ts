@@ -17,6 +17,8 @@ export interface Card {
 export interface PlayerData {
   _gameType: _gameType;
   role: "spymaster" | "operative";
+  // For AI players - if true, will always pass on bonus guess
+  alwaysPassOnBonusGuess?: boolean;
 }
 
 export type ProviderOptions = Record<string, Record<string, JSONValue>>;

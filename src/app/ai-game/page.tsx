@@ -10,6 +10,7 @@ type PlayerConfig = {
   aiModel: string;
   withReasoning: boolean;
   systemPrompt?: string;
+  alwaysPassOnBonusGuess?: boolean;
 };
 
 type PlayerRole =
@@ -29,21 +30,25 @@ export default function AIGamePage() {
       aiModel: "google/gemini-2.5-flash",
       withReasoning: false,
       systemPrompt: ``,
+      alwaysPassOnBonusGuess: false,
     },
     redTeamOperative: {
       aiModel: "google/gemini-2.5-flash",
       withReasoning: false,
       systemPrompt: ``,
+      alwaysPassOnBonusGuess: false,
     },
     blueTeamSpymaster: {
       aiModel: "google/gemini-2.5-flash",
       withReasoning: false,
       systemPrompt: ``,
+      alwaysPassOnBonusGuess: false,
     },
     blueTeamOperative: {
       aiModel: "google/gemini-2.5-flash",
       withReasoning: false,
       systemPrompt: ``,
+      alwaysPassOnBonusGuess: false,
     },
   });
 
@@ -277,6 +282,54 @@ export default function AIGamePage() {
                   placeholder="Enter a label for the game"
                   className="mb-4 w-full rounded border border-gray-300 px-2 py-1 text-sm focus:ring-1 focus:ring-indigo-500 focus:outline-none"
                 />
+                <div className="flex flex-row justify-between">
+                <div className="flex items-start w-1/2">
+                  <input // For now I am just going to have all players have the same alwaysPassOnBonusGuess
+                    type="checkbox"
+                    id="alwaysPassOnBonusGuess"
+                    checked={players.redTeamOperative.alwaysPassOnBonusGuess}
+                    onChange={(e) => {
+                      setPlayers((prev) => ({
+                        ...prev,
+                        redTeamOperative: {
+                          ...prev.redTeamOperative,
+                          alwaysPassOnBonusGuess: e.target.checked,
+                        },
+                      }));
+                    }}
+                    className="mr-1 h-3 w-3 text-green-600 focus:ring-green-500"
+                  />
+                  <label
+                    htmlFor="blueOperativeReasoningAI"
+                    className="text-xs text-red-600 "
+                  >
+                    Always Pass on Bonus Guess
+                  </label>
+                </div>
+                <div className="flex items-start w-1/2">
+                  <input
+                    type="checkbox"
+                    id="alwaysPassOnBonusGuess"
+                    checked={players.blueTeamOperative.alwaysPassOnBonusGuess}
+                    onChange={(e) => {
+                      setPlayers((prev) => ({
+                        ...prev,
+                        blueTeamOperative: {
+                          ...prev.blueTeamOperative,
+                          alwaysPassOnBonusGuess: e.target.checked,
+                        },
+                      }));
+                    }}
+                    className="mr-1 h-3 w-3 text-green-600 focus:ring-green-500"
+                  />
+                  <label
+                    htmlFor="bluealwaysPassOnBonusGuess"
+                    className="text-xs text-blue-600"
+                  >
+                    Always Pass on Bonus Guess
+                  </label>
+                </div>
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <h4 className="text-md mb-2 font-medium text-red-600">
@@ -485,31 +538,33 @@ export default function AIGamePage() {
                             Operative Model
                           </label>
                           {players.blueTeamOperative.aiModel !== "human" && (
-                            <div className="flex items-center">
-                              <input
-                                type="checkbox"
-                                id="blueOperativeReasoningAI"
-                                checked={
-                                  players.blueTeamOperative.withReasoning
-                                }
-                                onChange={(e) => {
-                                  setPlayers((prev) => ({
-                                    ...prev,
-                                    blueTeamOperative: {
-                                      ...prev.blueTeamOperative,
-                                      withReasoning: e.target.checked,
-                                    },
-                                  }));
-                                }}
-                                className="mr-1 h-3 w-3 text-blue-600 focus:ring-blue-500"
-                              />
-                              <label
-                                htmlFor="blueOperativeReasoningAI"
-                                className="text-xs text-gray-600"
-                              >
-                                With Reasoning
-                              </label>
-                            </div>
+                            <>
+                              <div className="flex items-center">
+                                <input
+                                  type="checkbox"
+                                  id="blueOperativeReasoningAI"
+                                  checked={
+                                    players.blueTeamOperative.withReasoning
+                                  }
+                                  onChange={(e) => {
+                                    setPlayers((prev) => ({
+                                      ...prev,
+                                      blueTeamOperative: {
+                                        ...prev.blueTeamOperative,
+                                        withReasoning: e.target.checked,
+                                      },
+                                    }));
+                                  }}
+                                  className="mr-1 h-3 w-3 text-blue-600 focus:ring-blue-500"
+                                />
+                                <label
+                                  htmlFor="blueOperativeReasoningAI"
+                                  className="text-xs text-gray-600"
+                                >
+                                  With Reasoning
+                                </label>
+                              </div>
+                            </>
                           )}
                         </div>
                         <select
