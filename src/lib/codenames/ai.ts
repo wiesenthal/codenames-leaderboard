@@ -87,23 +87,23 @@ export class CodenamesAI {
 
     while (retries > 0) {
       try {
-        const prompt = `You are playing Codenames as the ${myTeam} team spymaster. Your goal is to give a one-word clue that helps your operatives identify your team's cards while avoiding enemy cards, neutral cards, and especially the assassin.
+        const prompt = `You are playing Codenames as the ${myTeam} team spymaster. Your goal is to give a one-word clue that helps your operatives identify your team's cards while avoiding enemy cards, neutral cards, and especially the assassin. Your operative does not know which cards are yours, enemies, or neutrals.
 
     GAME STATE:
     - Current turn: ${gameState.currentTeam} team (${gameState.currentTeam === myTeam ? "YOUR TURN" : "not your turn"})
     - Your team (${myTeam}) has ${gameState.currentTeam === "red" ? gameState.redAgentsRemaining : gameState.blueAgentsRemaining} agents remaining
     - Enemy team has ${gameState.currentTeam === "red" ? gameState.blueAgentsRemaining : gameState.redAgentsRemaining} agents remaining
     
-    YOUR CARDS (that you want operatives to guess):
+    YOUR CARDS - that you want operatives to guess:
     ${myCards.map((card) => `- ${card.word}`).join("\n")}
     
-    ENEMY CARDS (avoid these):
+    NEUTRAL CARDS - AVOID these (if your operative guesses one it ends the turn):
+    ${neutralCards.map((card) => `- ${card.word}`).join("\n")}
+
+    ENEMY CARDS - AVOID these (if your operative guesses one it ends the turn AND the enemy earns the point):
     ${enemyCards.map((card) => `- ${card.word}`).join("\n")}
     
-    NEUTRAL CARDS (avoid these):
-    ${neutralCards.map((card) => `- ${card.word}`).join("\n")}
-    
-    ASSASSIN CARD (NEVER hint at this - instant loss):
+    ASSASSIN CARD - NEVER hint at this (if your operative guesses it you lose instantly):
     ${assassinCard ? `- ${assassinCard.word}` : "- (already revealed)"}
     
     RULES:
