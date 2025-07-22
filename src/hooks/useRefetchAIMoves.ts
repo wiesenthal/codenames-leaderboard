@@ -3,9 +3,7 @@ import { api } from "~/trpc/react";
 
 export const useRefetchAIMoves = () => {
   const { refetch: checkIfAIMoveIsNeeded } =
-    api.game.checkIfAIMoveIsNeeded.useQuery(undefined, {
-      refetchInterval: 10000,
-    });
+    api.game.checkIfAIMoveIsNeeded.useQuery();
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {

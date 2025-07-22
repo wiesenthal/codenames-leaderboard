@@ -1,4 +1,3 @@
-import type { JSONValue } from "ai";
 import { z } from "zod";
 
 export type Team = string; // red | blue
@@ -21,7 +20,14 @@ export interface PlayerData {
   alwaysPassOnBonusGuess?: boolean;
 }
 
-export type ProviderOptions = Record<string, Record<string, JSONValue>>;
+export type ProviderOptions = {
+  openrouter: {
+    reasoning: {
+      enabled?: boolean;
+      effort?: "low" | "medium" | "high";
+    };
+  };
+};
 
 export interface Player {
   id: string;
@@ -76,6 +82,7 @@ export const ClueSchema = z.object({
   word: z.string(),
   count: z.number(),
   reasoning: z.string().optional(),
+  providerReasoning: z.string().optional(),
 });
 
 export type Clue = z.infer<typeof ClueSchema>;
@@ -85,6 +92,7 @@ export const GuessSchema = z.object({
   _type: z.literal("guess"),
   cardIndex: z.number(),
   reasoning: z.string().optional(),
+  providerReasoning: z.string().optional(),
   correctness: z
     .enum(["correct", "incorrect", "neutral", "assassin"])
     .optional(),
@@ -101,6 +109,7 @@ export const PassSchema = z.object({
   reasoning: z.string().optional(),
   clueWord: z.string().optional(),
   clueCount: z.number().optional(),
+  providerReasoning: z.string().optional(),
   remainingGuessesBefore: z.number().optional(),
 });
 

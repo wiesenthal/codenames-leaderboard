@@ -1,18 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { api } from "~/trpc/react";
 import { useRouter } from "next/navigation";
-import type { Player } from "~/lib/codenames/types";
+import type { Player, ProviderOptions } from "~/lib/codenames/types";
 import { sleep } from "~/lib/utils/misc";
-import type { JSONValue } from "ai";
 
 type PlayerConfig = {
   aiModel: string;
   withReasoning: boolean;
   systemPrompt?: string;
   alwaysPassOnBonusGuess?: boolean;
-  providerOptions?: Record<string, Record<string, JSONValue>>;
+  providerOptions?: ProviderOptions;
 };
 
 type PlayerRole =
@@ -364,7 +363,7 @@ export default function AIGamePage() {
                                 htmlFor="redSpymasterReasoningAI"
                                 className="text-xs text-gray-600"
                               >
-                                With Reasoning
+                                Reasoning Field
                               </label>
                             </div>
                           )}
@@ -395,8 +394,8 @@ export default function AIGamePage() {
                             className="mt-1 w-full rounded border border-red-300 bg-red-50 px-2 py-1 text-xs text-red-700 hover:bg-red-100"
                           >
                             {players.redTeamSpymaster.systemPrompt
-                              ? "Edit Prompt"
-                              : "Add Prompt"}
+                              ? "Edit Prompt & Reasoning"
+                              : "Prompt & Reasoning"}
                           </button>
                         )}
                       </div>
@@ -426,7 +425,7 @@ export default function AIGamePage() {
                                 htmlFor="redOperativeReasoningAI"
                                 className="text-xs text-gray-600"
                               >
-                                With Reasoning
+                                Reasoning Field
                               </label>
                             </div>
                           )}
@@ -457,8 +456,8 @@ export default function AIGamePage() {
                             className="mt-1 w-full rounded border border-red-300 bg-red-50 px-2 py-1 text-xs text-red-700 hover:bg-red-100"
                           >
                             {players.redTeamOperative.systemPrompt
-                              ? "Edit Prompt"
-                              : "Add Prompt"}
+                              ? "Edit Prompt & Reasoning"
+                              : "Prompt & Reasoning"}
                           </button>
                         )}
                       </div>
@@ -498,7 +497,7 @@ export default function AIGamePage() {
                                 htmlFor="blueSpymasterReasoningAI"
                                 className="text-xs text-gray-600"
                               >
-                                With Reasoning
+                                Reasoning Field
                               </label>
                             </div>
                           )}
@@ -529,8 +528,8 @@ export default function AIGamePage() {
                             className="mt-1 w-full rounded border border-blue-300 bg-blue-50 px-2 py-1 text-xs text-blue-700 hover:bg-blue-100"
                           >
                             {players.blueTeamSpymaster.systemPrompt
-                              ? "Edit Prompt"
-                              : "Add Prompt"}
+                              ? "Edit Prompt & Reasoning"
+                              : "Prompt & Reasoning"}
                           </button>
                         )}
                       </div>
@@ -563,7 +562,7 @@ export default function AIGamePage() {
                                   htmlFor="blueOperativeReasoningAI"
                                   className="text-xs text-gray-600"
                                 >
-                                  With Reasoning
+                                  Reasoning Field
                                 </label>
                               </div>
                             </>
@@ -595,8 +594,8 @@ export default function AIGamePage() {
                             className="mt-1 w-full rounded border border-blue-300 bg-blue-50 px-2 py-1 text-xs text-blue-700 hover:bg-blue-100"
                           >
                             {players.blueTeamOperative.systemPrompt
-                              ? "Edit Prompt"
-                              : "Add Prompt"}
+                              ? "Edit Prompt & Reasoning"
+                              : "Prompt & Reasoning"}
                           </button>
                         )}
                       </div>
@@ -689,48 +688,63 @@ export default function AIGamePage() {
               {/* Provider Options */}
               <div className="mb-4">
                 <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Anthropic Reasoning
+                  Reasoning (Note: this is only supported for some models)
                 </label>
                 <div className="space-y-2">
                   <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={
-                        !!players[currentEditingRole]?.providerOptions
-                          ?.anthropic?.thinking
+                    <select
+                      value={
+                        players[currentEditingRole]?.providerOptions?.openrouter
+                          ?.reasoning?.effort ??
+                        (players[currentEditingRole]?.providerOptions
+                          ?.openrouter?.reasoning?.enabled === false
+                          ? "off"
+                          : "auto")
                       }
                       onChange={(e) => {
+                        const effort = e.target.value;
                         setPlayers((prev) => ({
                           ...prev,
                           [currentEditingRole]: {
                             ...prev[currentEditingRole],
-                            providerOptions: e.target.checked
-                              ? {
-                                  ...prev[currentEditingRole].providerOptions,
-                                  anthropic: {
-                                    thinking: {
-                                      type: "enabled",
-                                      budgetTokens: 500,
+                            providerOptions:
+                              effort === "auto"
+                                ? undefined
+                                : effort === "off"
+                                  ? {
+                                      openrouter: {
+                                        reasoning: {
+                                          enabled: false,
+                                        },
+                                      },
+                                    }
+                                  : {
+                                      openrouter: {
+                                        reasoning: {
+                                          enabled: true,
+                                          effort: effort as
+                                            | "low"
+                                            | "medium"
+                                            | "high",
+                                        },
+                                      },
                                     },
-                                  },
-                                }
-                              : {
-                                  ...prev[currentEditingRole].providerOptions,
-                                  anthropic: undefined,
-                                },
                           },
                         }));
                       }}
-                      className="mr-2 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                    />
+                      className="mr-2 rounded border-gray-300 px-3 py-1 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                    >
+                      <option value="auto">Auto</option>
+                      <option value="off">Off</option>
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                    </select>
                     <span className="text-sm text-gray-700">
-                      Enable Anthropic thinking (12k token budget)
+                      Reasoning level
                     </span>
                   </label>
                 </div>
-                <p className="mt-1 text-xs text-gray-500">
-                  Configure provider-specific options for this AI player.
-                </p>
               </div>
             </div>
 

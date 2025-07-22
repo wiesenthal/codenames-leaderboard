@@ -1,4 +1,4 @@
-import { generateObject } from "ai";
+import { generateText, Output, zodSchema } from "ai";
 import type {
   AIPlayer,
   Clue,
@@ -85,6 +85,12 @@ export class CodenamesAI {
     let lastError: Error | null = null;
     const previousClues: string[] = [];
 
+    const objectSchema = z.object({
+      ...(player.withReasoning ? { reasoning: z.string() } : {}),
+      word: z.string(),
+      count: z.number(),
+    });
+
     while (retries > 0) {
       try {
         const prompt = `You are playing Codenames as the ${myTeam} team spymaster. Your goal is to give a one-word clue that helps your operatives identify your team's cards while avoiding enemy cards, neutral cards, and especially the assassin. Your operative does not know which cards are yours, enemies, or neutrals.
@@ -128,35 +134,31 @@ export class CodenamesAI {
     ${lastError ? `Your previous clue: ${previousClues.at(-1)} were invalid. Last error: ${lastError.message}` : ""}
     `;
         console.log(`[AI] generating spymaster clue with ${player.aiModel}`);
-        const { object, providerMetadata, response } = await generateObject({
-          model: openrouter(player.aiModel),
-          system: player.systemPrompt || undefined, // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing
-          prompt,
-          temperature: 0.7,
-          schema: z.object({
-            ...(player.withReasoning ? { reasoning: z.string() } : {}),
-            word: z.string(),
-            count: z.number(),
-          }),
-          providerOptions: player.providerOptions ?? undefined,
-        });
-
-        if (providerMetadata) {
-          console.log(
-            `[AI] Provider metadata: ${JSON.stringify(providerMetadata, null, 2)}`,
-          );
-        }
-
-        // if (response) {
-        //   console.log(`[AI] Response: ${JSON.stringify(response, null, 2)}`);
-        // }
+        const { experimental_output: object, reasoning: providerReasoning } =
+          await generateText({
+            model: openrouter(player.aiModel, {
+              extraBody: {
+                response_format: {
+                  type: "json_object",
+                  json_schema: zodSchema(objectSchema),
+                },
+              },
+            }),
+            system: player.systemPrompt || undefined, // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing
+            prompt,
+            temperature: 0.7,
+            experimental_output: Output.object({
+              schema: objectSchema,
+            }),
+            providerOptions: player.providerOptions,
+          });
 
         const { word, count } = object;
 
         previousClues.push(word.toLowerCase().trim());
 
         console.log(
-          `${player.aiModel} generated clue: ${word} - ${count} - ${player.withReasoning ? (object.reasoning as string) : ""}`,
+          `${player.aiModel} generated clue: ${word} - ${count}. Provider reasoning: ${providerReasoning}. ${"reasoning" in object && typeof object.reasoning === "string" ? `Object reasoning: ${object.reasoning}` : ""}`,
         );
 
         const additionalFields = player.withReasoning
@@ -178,15 +180,19 @@ export class CodenamesAI {
           _type: "clue",
           word: word.toLowerCase().trim(),
           count,
+          providerReasoning,
           ...additionalFields,
         };
       } catch (error) {
         lastError = error as Error;
+        console.error(
+          `[AI] ${player.aiModel} error: ${error instanceof Error ? error.message : String(error)}`,
+        );
         retries--;
       }
     }
 
-    console.log(
+    console.error(
       `[AI] Failed to generate clue after ${historyToInclude} attempts. Error: ${lastError?.message ?? "Unknown error"}`,
     );
 
@@ -227,13 +233,22 @@ export class CodenamesAI {
       };
     }
 
-    if (player.data.alwaysPassOnBonusGuess && usedGuesses === currentClue.count) {
+    if (
+      player.data.alwaysPassOnBonusGuess &&
+      usedGuesses === currentClue.count
+    ) {
       return {
         _gameType: "codenames",
         _type: "pass",
         reasoning: `__SYSTEM__: alwaysPassOnBonusGuess is true`,
       };
     }
+
+    const objectSchema = z.object({
+      ...(player.withReasoning ? { reasoning: z.string() } : {}),
+      word: z.string().nullable(),
+      shouldPass: z.boolean(),
+    });
 
     const prompt = `You are playing Codenames as a ${myTeam} team operative. Your spymaster just gave you a clue, and you need to decide which card to guess or whether to pass your turn.
 
@@ -285,22 +300,29 @@ Respond with ONLY a JSON object in this format:
 }`;
 
     try {
-      const { object } = await generateObject({
-        model: openrouter(player.aiModel),
-        system: player.systemPrompt || undefined, // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing
-        prompt,
-        temperature: 0.8,
-        schema: z.object({
-          ...(player.withReasoning ? { reasoning: z.string() } : {}),
-          word: z.string().nullable(),
-          shouldPass: z.boolean(),
-        }),
-      });
+      const { experimental_output: object, reasoning: providerReasoning } =
+        await generateText({
+          model: openrouter(player.aiModel, {
+            extraBody: {
+              response_format: {
+                type: "json_object",
+                json_schema: zodSchema(objectSchema),
+              },
+            },
+          }),
+          system: player.systemPrompt || undefined, // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing
+          prompt,
+          temperature: 0.8,
+          experimental_output: Output.object({
+            schema: objectSchema,
+          }),
+          providerOptions: player.providerOptions ?? undefined,
+        });
 
       const { word } = object;
 
       console.log(
-        `${player.aiModel} generated guess: ${word} - ${player.withReasoning ? (object.reasoning as string) : ""}`,
+        `${player.aiModel} generated guess: ${word}. ${providerReasoning && `Provider reasoning: ${providerReasoning}`}. ${"reasoning" in object && typeof object.reasoning === "string" ? `Object reasoning: ${object.reasoning}` : ""}`,
       );
 
       const additionalFields = player.withReasoning
@@ -312,6 +334,7 @@ Respond with ONLY a JSON object in this format:
         return {
           _gameType: "codenames",
           _type: "pass",
+          providerReasoning,
           ...additionalFields,
         };
       }
@@ -325,6 +348,7 @@ Respond with ONLY a JSON object in this format:
         return {
           _gameType: "codenames",
           _type: "pass",
+          providerReasoning,
           ...additionalFields,
         };
       }
@@ -333,6 +357,7 @@ Respond with ONLY a JSON object in this format:
         _gameType: "codenames",
         _type: "guess",
         cardIndex,
+        providerReasoning,
         ...additionalFields,
       };
     } catch (error) {

@@ -307,11 +307,15 @@ export default function GamePage() {
               {/* Activity Indicator */}
               <div className="mb-4 rounded-lg border border-purple-300 bg-purple-100 p-3">
                 <div className="flex items-center">
-                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-purple-600"></div>
+                  <div
+                    className={`mr-2 h-4 w-4 rounded-full border-b-2 border-purple-600 ${
+                      aiThinking ? "animate-spin" : "invisible"
+                    }`}
+                  ></div>
                   <p className="text-purple-800">
                     {currentAIPlayer && aiThinking
                       ? `🤖 ${currentAIPlayer.name} is thinking...`
-                      : "..."}
+                      : ""}
                   </p>
                 </div>
               </div>

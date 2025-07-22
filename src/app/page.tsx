@@ -127,17 +127,22 @@ export default function HomePage() {
                       Players:{" "}
                       <div className="grid grid-flow-col grid-cols-2 grid-rows-2 gap-1">
                         {game.players.map((p) => (
-                          <div
+                          <a
                             key={p.id}
-                            className={`flex text-sm ${p.team === "red" ? "text-red-600" : "text-blue-600"}`}
+                            href={`/game/${game.id}?playerId=${p.id}`}
+                            className={`flex text-sm ${p.type === "human" ? "underline" : ""}`}
                           >
-                            <div className="w-44 text-nowrap pl-2 text-xs overflow-x-scroll">
-                              {p.aiModel ?? "human"}
+                            <div
+                              className={`flex text-sm ${p.team === "red" ? "text-red-600" : "text-blue-600"}`}
+                            >
+                              <div className="w-44 overflow-x-scroll pl-2 text-xs text-nowrap">
+                                {p.aiModel ?? "human"}
+                              </div>
+                              <div className="w-18 overflow-x-scroll pl-2 text-xs">
+                                {p.data.role}
+                              </div>
                             </div>
-                            <div className="w-18 pl-2 text-xs overflow-x-scroll">
-                              {p.data.role}
-                            </div>
-                          </div>
+                          </a>
                         ))}
                       </div>
                       <p>
