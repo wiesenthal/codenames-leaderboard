@@ -237,26 +237,11 @@ export class CodenamesGameEngine {
       success: false,
     };
     if (type === "clue") {
-      result = await this.giveClue(
-        action.playerId,
-        action.data.word,
-        action.data.count,
-        action.data.reasoning,
-        action.data.providerReasoning,
-      );
+      result = await this.giveClue(action.playerId, action.data);
     } else if (type === "guess") {
-      result = await this.makeGuess(
-        action.playerId,
-        action.data.cardIndex,
-        action.data.reasoning,
-        action.data.providerReasoning,
-      );
+      result = await this.makeGuess(action.playerId, action.data);
     } else if (type === "pass") {
-      result = await this.passTurn(
-        action.playerId,
-        action.data.reasoning,
-        action.data.providerReasoning,
-      );
+      result = await this.passTurn(action.playerId, action.data);
     }
 
     if (result.gameState)
@@ -275,10 +260,7 @@ export class CodenamesGameEngine {
 
   public async giveClue(
     playerId: string,
-    word: string,
-    count: number,
-    reasoning?: string,
-    providerReasoning?: string,
+    { word, count, reasoning, providerReasoning }: Clue,
   ): Promise<{ success: boolean; error?: string }> {
     this.ensureInitialized();
 
@@ -377,9 +359,7 @@ export class CodenamesGameEngine {
 
   public async makeGuess(
     playerId: string,
-    cardIndex: number,
-    reasoning?: string,
-    providerReasoning?: string,
+    { cardIndex, reasoning, providerReasoning }: Guess,
   ): Promise<{ success: boolean; error?: string; gameState?: GameState }> {
     this.ensureInitialized();
 
@@ -621,8 +601,7 @@ export class CodenamesGameEngine {
 
   public async passTurn(
     playerId: string,
-    reasoning?: string,
-    providerReasoning?: string,
+    { reasoning, providerReasoning }: Pass,
   ): Promise<{ success: boolean; error?: string; gameState?: GameState }> {
     this.ensureInitialized();
 

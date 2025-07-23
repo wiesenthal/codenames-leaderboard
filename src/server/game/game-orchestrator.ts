@@ -180,8 +180,6 @@ export class GameOrchestrator {
 
     const aiPlayer = new CodenamesAI(player);
 
-    console.log(`[Orchestrator] ${player.name} is making a move...`);
-
     const action = await aiPlayer.takeAction(game.gameState, game.gameHistory);
     const result = await gameEngine.takeAction(action);
     if (!result.success) {

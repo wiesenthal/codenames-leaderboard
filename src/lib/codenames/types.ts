@@ -129,7 +129,6 @@ export type GameAction = GameActionInput & {
   gameId: string;
   team: Team;
 };
-
 export interface GameConfig {
   label?: string;
   words: string[];
