@@ -242,15 +242,21 @@ export class CodenamesGameEngine {
         action.data.word,
         action.data.count,
         action.data.reasoning,
+        action.data.providerReasoning,
       );
     } else if (type === "guess") {
       result = await this.makeGuess(
         action.playerId,
         action.data.cardIndex,
         action.data.reasoning,
+        action.data.providerReasoning,
       );
     } else if (type === "pass") {
-      result = await this.passTurn(action.playerId, action.data.reasoning);
+      result = await this.passTurn(
+        action.playerId,
+        action.data.reasoning,
+        action.data.providerReasoning,
+      );
     }
 
     if (result.gameState)
@@ -272,6 +278,7 @@ export class CodenamesGameEngine {
     word: string,
     count: number,
     reasoning?: string,
+    providerReasoning?: string,
   ): Promise<{ success: boolean; error?: string }> {
     this.ensureInitialized();
 
@@ -316,6 +323,7 @@ export class CodenamesGameEngine {
         word: word.toLowerCase(),
         count,
         reasoning,
+        providerReasoning,
       };
 
       const [gameAction] = await trx
@@ -371,6 +379,7 @@ export class CodenamesGameEngine {
     playerId: string,
     cardIndex: number,
     reasoning?: string,
+    providerReasoning?: string,
   ): Promise<{ success: boolean; error?: string; gameState?: GameState }> {
     this.ensureInitialized();
 
@@ -429,6 +438,7 @@ export class CodenamesGameEngine {
           _type: "guess",
           cardIndex,
           reasoning,
+          providerReasoning,
           correctness,
           clueWord: state.currentClue?.word,
           clueCount: state.currentClue?.count,
@@ -612,6 +622,7 @@ export class CodenamesGameEngine {
   public async passTurn(
     playerId: string,
     reasoning?: string,
+    providerReasoning?: string,
   ): Promise<{ success: boolean; error?: string; gameState?: GameState }> {
     this.ensureInitialized();
 
@@ -635,6 +646,7 @@ export class CodenamesGameEngine {
         _gameType,
         _type: "pass",
         reasoning,
+        providerReasoning,
         clueWord: state.currentClue?.word,
         clueCount: state.currentClue?.count,
         remainingGuessesBefore: state.remainingGuesses,

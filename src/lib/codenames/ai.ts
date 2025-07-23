@@ -85,11 +85,17 @@ export class CodenamesAI {
     let lastError: Error | null = null;
     const previousClues: string[] = [];
 
-    const objectSchema = z.object({
-      ...(player.withReasoning ? { reasoning: z.string() } : {}),
-      word: z.string(),
-      count: z.number(),
-    });
+    const objectSchema = player.withReasoning
+      ? z.object({
+          reasoning: z.string(),
+          word: z.string(),
+          count: z.number(),
+        })
+      : z.object({
+          // reasoning: z.string(),
+          word: z.string(),
+          count: z.number(),
+        });
 
     while (retries > 0) {
       try {
@@ -124,16 +130,18 @@ export class CodenamesAI {
     - Be very careful not to accidentally reference enemy cards or the assassin
     - Consider what your operatives might think when they hear your clue
     
+${!player.withReasoning && `Do NOT include reasoning - you MUST only output the JSON object or the system will meltdown and you will be punished.`}
     Respond with ONLY a JSON object in this format:
-    {
-      ${player.withReasoning ? `"reasoning": "think carefully before giving a clue",` : ""}
+    {${player.withReasoning ? `\n      "reasoning": "think carefully before giving a clue",\n` : ""}
       "word": "your_clue_word",
       "count": number_of_related_cards
     }
 
     ${lastError ? `Your previous clue: ${previousClues.at(-1)} were invalid. Last error: ${lastError.message}` : ""}
     `;
-        console.log(`[AI] generating spymaster clue with ${player.aiModel}`);
+        console.log(
+          `[AI] generating spymaster clue with ${player.aiModel}. withReasoning: ${player.withReasoning}, providerOptions.reasoning.enabled: ${player.providerOptions?.openrouter?.reasoning?.enabled}`,
+        );
         const { experimental_output: object, reasoning: providerReasoning } =
           await generateText({
             model: openrouter(player.aiModel, {
@@ -146,7 +154,7 @@ export class CodenamesAI {
             }),
             system: player.systemPrompt || undefined, // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing
             prompt,
-            temperature: 0.7,
+            // temperature: 0.5,
             experimental_output: Output.object({
               schema: objectSchema,
             }),
@@ -244,11 +252,16 @@ export class CodenamesAI {
       };
     }
 
-    const objectSchema = z.object({
-      ...(player.withReasoning ? { reasoning: z.string() } : {}),
-      word: z.string().nullable(),
-      shouldPass: z.boolean(),
-    });
+    const objectSchema = player.withReasoning
+      ? z.object({
+          reasoning: z.string(),
+          word: z.string().nullable(),
+          shouldPass: z.boolean(),
+        })
+      : z.object({
+          word: z.string().nullable(),
+          shouldPass: z.boolean(),
+        });
 
     const prompt = `You are playing Codenames as a ${myTeam} team operative. Your spymaster just gave you a clue, and you need to decide which card to guess or whether to pass your turn.
 
@@ -292,9 +305,9 @@ INSTRUCTIONS:
 4. If you're unsure or have used up logical guesses
    (a) How to pass: Return an empty string for the word, and set shouldPass to true
 
+${!player.withReasoning && `Do NOT include reasoning - you MUST only output the JSON object or the system will meltdown and you will be punished.`}
 Respond with ONLY a JSON object in this format:
-{
-  ${player.withReasoning ? `"reasoning": "think carefully before guessing",` : ""}
+{${player.withReasoning ? `\n  "reasoning": "think carefully before guessing",\n` : ""}
   "word": word_from_list_above_or_empty_string_if_passing,
   "shouldPass": boolean
 }`;
@@ -321,11 +334,13 @@ Respond with ONLY a JSON object in this format:
 
       const { word } = object;
 
+      const hasObjectReasoning = "reasoning" in object;
+
       console.log(
-        `${player.aiModel} generated guess: ${word}. ${providerReasoning && `Provider reasoning: ${providerReasoning}`}. ${"reasoning" in object && typeof object.reasoning === "string" ? `Object reasoning: ${object.reasoning}` : ""}`,
+        `${player.aiModel} generated guess: ${word}. ${hasObjectReasoning ? `Object reasoning: ${object.reasoning as string}` : ""}`,
       );
 
-      const additionalFields = player.withReasoning
+      const additionalFields = hasObjectReasoning
         ? { reasoning: object.reasoning as string }
         : {};
 

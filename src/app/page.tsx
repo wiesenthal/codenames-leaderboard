@@ -94,7 +94,10 @@ export default function HomePage() {
                     <div className="mb-2 flex items-start justify-between">
                       <div>
                         <p className="font-medium text-gray-800">
-                          Game {game.id.slice(-6)}
+                          {game.label}{" "}
+                          <span className="text-xs text-gray-500">
+                            {game.id}
+                          </span>
                         </p>
                         <p className="text-sm text-gray-600">
                           Current:{" "}
